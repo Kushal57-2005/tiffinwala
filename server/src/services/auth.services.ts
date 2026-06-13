@@ -8,7 +8,6 @@ import { generateOTP, getOTPExpiry, isOTPExpired } from '../utils/otp';
 import { sendPhoneOTP } from '../utils/phone';
 import { Response } from 'express';
 import crypto from 'crypto';
-import { Message } from 'twilio/lib/twiml/MessagingResponse';
 
 export const verifyPhoneOTPService = async (userId: string, otp: string) => {
     const user = await User.findById(userId);
@@ -377,5 +376,71 @@ export const changePasswordService = async (
 
     return {
         message: 'Password changed successfully',
+    };
+};
+
+export const resendEmailOTPService = async (userId: string) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, 'User not found');
+    }
+
+    if (user.isEmailVerified === true) {
+        throw new ApiError(400, 'User is already verified to email');
+    }
+
+    const lastSentTime = user.emailOTPExpiry
+        ? new Date(user.emailOTPExpiry.getTime() - 10 * 60 * 1000) // expiry was set 10 min after send
+        : null;
+
+    if (lastSentTime && Date.now() - lastSentTime.getTime() < 60 * 1000) {
+        throw new ApiError(429, 'Please wait before requesting another OTP');
+    }
+
+    const emailOTP = generateOTP();
+    const emailOTPExpiry = getOTPExpiry();
+
+    user.emailOTP = emailOTP;
+    user.emailOTPExpiry = emailOTPExpiry;
+    await user.save();
+
+    await sendEmailOTP(user.email, emailOTP);
+
+    return {
+        userId: user._id,
+        message: 'OTP is send to email',
+    };
+};
+
+export const resendPhoneOTPService = async (userId: string) => {
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(400, 'User not found');
+    }
+
+    if (user.isPhoneVerified === true) {
+        throw new ApiError(404, 'User is already verified to phone');
+    }
+
+    const lastSentTime = user.phoneOTPExpiry
+        ? new Date(user.phoneOTPExpiry.getTime() - 10 * 60 * 1000) // expiry was set 10 min after send
+        : null;
+
+    if (lastSentTime && Date.now() - lastSentTime.getTime() < 60 * 1000) {
+        throw new ApiError(429, 'Please wait before requesting another OTP');
+    }
+
+    const phoneOTP = generateOTP();
+    const phoneOTPExpiry = getOTPExpiry();
+
+    user.phoneOTP = phoneOTP;
+    user.phoneOTPExpiry = phoneOTPExpiry;
+    await user.save();
+
+    await sendPhoneOTP(user.phone, phoneOTP);
+
+    return {
+        userId: user._id,
+        message: 'OTP is send to phone',
     };
 };

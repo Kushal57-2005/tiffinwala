@@ -17,5 +17,7 @@ router.post('/forget-password', auth_controllers_1.forgetPassword);
 router.post('/verify-reset-otp', auth_controllers_1.verifyResetOTP);
 router.post('/reset-password', auth_controllers_1.resetPassword);
 router.post('/change-password', auth_middleware_1.authMiddleware, auth_controllers_1.changePassword);
+router.post('/resend-email-otp', auth_controllers_1.resendEmailOTP);
+router.post('/resend-phone-otp', auth_controllers_1.resendPhoneOTP);
 exports.default = router;
 //# sourceMappingURL=auth.routes.js.map

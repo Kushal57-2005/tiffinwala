@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/static-components */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -65,7 +65,11 @@ const FloatingInput = ({
                 <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center text-charcoal/50 hover:text-spice transition-colors z-20"
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors z-20 ${
+                        role === 'customer'
+                            ? 'text-leaf hover:text-leaf/80'
+                            : 'text-spice hover:text-spice/80'
+                    }`}
                 >
                     {showPassword ? (
                         <svg
@@ -133,6 +137,23 @@ export default function Register() {
     const [step, setStep] = useState(1);
     const [userId, setUserId] = useState('');
     const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+    const [phoneTimer, setPhoneTimer] = useState(0);
+    const [emailTimer, setEmailTimer] = useState(0);
+
+    // Countdown timers for OTP resending
+    useEffect(() => {
+        if (phoneTimer > 0) {
+            const timer = setTimeout(() => setPhoneTimer(phoneTimer - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [phoneTimer]);
+
+    useEffect(() => {
+        if (emailTimer > 0) {
+            const timer = setTimeout(() => setEmailTimer(emailTimer - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [emailTimer]);
 
     // UI Visual States
     const [showPassword, setShowPassword] = useState(false);
@@ -277,6 +298,40 @@ export default function Register() {
             } else {
                 setError(errMsg);
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendPhoneOtp = async () => {
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await api.post('/auth/resend-phone-otp', { userId });
+            setSuccess(res.data.message || 'OTP resent to phone successfully');
+            setOtpDigits(['', '', '', '', '', '']);
+            setPhoneTimer(30);
+        } catch (err: any) {
+            const errMsg = err.response?.data?.message || err.message || 'Failed to resend OTP';
+            setError(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResendEmailOtp = async () => {
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await api.post('/auth/resend-email-otp', { userId });
+            setSuccess(res.data.message || 'OTP resent to email successfully');
+            setOtpDigits(['', '', '', '', '', '']);
+            setEmailTimer(30);
+        } catch (err: any) {
+            const errMsg = err.response?.data?.message || err.message || 'Failed to resend OTP';
+            setError(errMsg);
         } finally {
             setLoading(false);
         }
@@ -831,16 +886,34 @@ export default function Register() {
                                     )}
                                 </button>
 
-                                <button
-                                    onClick={() => {
-                                        setStep(1);
-                                        setOtpDigits(['', '', '', '', '', '']);
-                                    }}
-                                    disabled={loading}
-                                    className="text-center text-xs font-semibold text-charcoal/60 hover:text-spice transition-colors py-2"
-                                >
-                                    Back to Details
-                                </button>
+                                <div className="flex justify-between items-center px-1 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={handleResendPhoneOtp}
+                                        disabled={loading || phoneTimer > 0}
+                                        className={`font-semibold transition-colors py-2 ${
+                                            phoneTimer > 0 
+                                                ? 'text-charcoal/40 cursor-not-allowed' 
+                                                : role === 'customer' 
+                                                ? 'text-leaf hover:text-leaf/80' 
+                                                : 'text-spice hover:text-spice/80'
+                                        }`}
+                                    >
+                                        {phoneTimer > 0 ? `Resend OTP in ${phoneTimer}s` : 'Resend OTP to Phone'}
+                                    </button>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStep(1);
+                                            setOtpDigits(['', '', '', '', '', '']);
+                                        }}
+                                        disabled={loading}
+                                        className="font-semibold text-charcoal/60 hover:text-charcoal transition-colors py-2"
+                                    >
+                                        Back to Details
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -894,6 +967,23 @@ export default function Register() {
                                         </>
                                     )}
                                 </button>
+
+                                <div className="flex justify-between items-center px-1 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={handleResendEmailOtp}
+                                        disabled={loading || emailTimer > 0}
+                                        className={`font-semibold transition-colors py-2 ${
+                                            emailTimer > 0 
+                                                ? 'text-charcoal/40 cursor-not-allowed' 
+                                                : role === 'customer' 
+                                                ? 'text-leaf hover:text-leaf/80' 
+                                                : 'text-spice hover:text-spice/80'
+                                        }`}
+                                    >
+                                        {emailTimer > 0 ? `Resend OTP in ${emailTimer}s` : 'Resend OTP to Email'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePassword = exports.resetPassword = exports.verifyResetOTP = exports.forgetPassword = exports.getMe = exports.logout = exports.loginVendorStep2 = exports.loginVendorStep1 = exports.loginCustomer = exports.registerVendor = exports.registerCustomer = exports.verifyEmailOTP = exports.verifyPhoneOTP = void 0;
+exports.resendPhoneOTP = exports.resendEmailOTP = exports.changePassword = exports.resetPassword = exports.verifyResetOTP = exports.forgetPassword = exports.getMe = exports.logout = exports.loginVendorStep2 = exports.loginVendorStep1 = exports.loginCustomer = exports.registerVendor = exports.registerCustomer = exports.verifyEmailOTP = exports.verifyPhoneOTP = void 0;
 const async_handler_1 = require("../utils/async-handler");
 const api_error_1 = require("../utils/api-error");
 const auth_services_1 = require("../services/auth.services");
@@ -131,5 +131,26 @@ exports.changePassword = (0, async_handler_1.asyncHandler)(async (req, res) => {
     return res
         .status(200)
         .json(new api_response_1.ApiResponse(200, result, 'Password changed successfully'));
+});
+exports.resendEmailOTP = (0, async_handler_1.asyncHandler)(async (req, res) => {
+    console.log('OTP c is s');
+    const { userId } = req.body;
+    if (!userId) {
+        throw new api_error_1.ApiError(400, 'userId is required');
+    }
+    const result = await (0, auth_services_1.resendEmailOTPService)(userId);
+    return res
+        .status(200)
+        .json(new api_response_1.ApiResponse(200, result, 'OTP resent to email'));
+});
+exports.resendPhoneOTP = (0, async_handler_1.asyncHandler)(async (req, res) => {
+    const { userId } = req.body;
+    if (!userId) {
+        throw new api_error_1.ApiError(400, 'userId is required');
+    }
+    const result = await (0, auth_services_1.resendPhoneOTPService)(userId);
+    return res
+        .status(200)
+        .json(new api_response_1.ApiResponse(200, result, 'OTP resent to phone'));
 });
 //# sourceMappingURL=auth.controllers.js.map

@@ -14,6 +14,8 @@ import {
     verifyResetOTPService,
     resetPasswordService,
     changePasswordService,
+    resendEmailOTPService,
+    resendPhoneOTPService,
 } from '../services/auth.services';
 import { ApiResponse } from '../utils/api-response';
 import { AuthRequest } from '../middlewares/auth.middleware';
@@ -242,12 +244,43 @@ export const changePassword = asyncHandler(
             oldPassword,
             newPassword,
         );
-        
 
         return res
             .status(200)
             .json(
                 new ApiResponse(200, result, 'Password changed successfully'),
             );
+    },
+);
+
+export const resendEmailOTP = asyncHandler(
+    async (req: Request, res: Response) => {
+        const { userId } = req.body;
+
+        if (!userId) {
+            throw new ApiError(400, 'userId is required');
+        }
+
+        const result = await resendEmailOTPService(userId);
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'OTP resent to email'));
+    },
+);
+
+export const resendPhoneOTP = asyncHandler(
+    async (req: Request, res: Response) => {
+        const { userId } = req.body;
+
+        if (!userId) {
+            throw new ApiError(400, 'userId is required');
+        }
+
+        const result = await resendPhoneOTPService(userId);
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'OTP resent to phone'));
     },
 );

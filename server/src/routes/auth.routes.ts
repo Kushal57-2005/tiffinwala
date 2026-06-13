@@ -13,6 +13,8 @@ import {
     verifyResetOTP,
     resetPassword,
     changePassword,
+    resendEmailOTP,
+    resendPhoneOTP,
 } from '../controllers/auth.controllers';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
@@ -31,5 +33,7 @@ router.post('/forget-password', forgetPassword);
 router.post('/verify-reset-otp', verifyResetOTP);
 router.post('/reset-password', resetPassword);
 router.post('/change-password', authMiddleware, changePassword);
+router.post('/resend-email-otp', resendEmailOTP);
+router.post('/resend-phone-otp', resendPhoneOTP);
 
 export default router;

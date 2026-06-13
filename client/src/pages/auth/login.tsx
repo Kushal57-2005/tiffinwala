@@ -70,7 +70,11 @@ const FloatingInput = ({
                 <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center text-charcoal/50 hover:text-spice transition-colors z-20"
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors z-20 ${
+                        role === 'customer'
+                            ? 'text-leaf hover:text-leaf/80'
+                            : 'text-spice hover:text-spice/80'
+                    }`}
                 >
                     {showPassword ? (
                         <svg
@@ -122,7 +126,18 @@ export default function Login() {
     const [emailOrPhone, setEmailOrPhone] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const [resendTimer, setResendTimer] = useState(0);
+
+    // Countdown timer for resending OTP
+    useEffect(() => {
+        if (resendTimer > 0) {
+            const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [resendTimer]);
 
     const [step, setStep] = useState(1);
     const [userId, setUserId] = useState('');
@@ -378,6 +393,24 @@ export default function Login() {
             setLoading(false);
         }
     };
+
+    const handleResendEmailOTP = async () => {
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const res = await api.post('/auth/resend-email-otp', { userId });
+            setSuccess(res.data.message || 'OTP resent to email successfully');
+            setOtpDigits(['', '', '', '', '', '']);
+            setResendTimer(30);
+        } catch (err: any) {
+            const errMsg = err.response?.data?.message || err.message || 'Failed to resend OTP';
+            setError(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
 
     return (
         <div
@@ -717,6 +750,26 @@ export default function Login() {
                         </div>
                     )}
 
+                    {/* Success Messages */}
+                    {success && (
+                        <div className="mb-6 p-4 rounded-2xl bg-leaf/15 border border-leaf/20 text-leaf text-xs flex items-start space-x-2 font-body">
+                            <svg
+                                className="w-4 h-4 mt-0.5 shrink-0"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2.5}
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
+                            </svg>
+                            <span>{success}</span>
+                        </div>
+                    )}
+
                     {/* Step 1: Input forms */}
                     {step === 1 && (
                         <form
@@ -913,16 +966,32 @@ export default function Login() {
                                     )}
                                 </button>
 
-                                <button
-                                    onClick={() => {
-                                        setStep(1);
-                                        setOtpDigits(['', '', '', '', '', '']);
-                                    }}
-                                    disabled={loading}
-                                    className="text-center text-xs font-semibold text-charcoal/60 hover:text-spice transition-colors py-2"
-                                >
-                                    Back to Login
-                                </button>
+                                <div className="flex justify-between items-center px-1 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={handleResendEmailOTP}
+                                        disabled={loading || resendTimer > 0}
+                                        className={`font-semibold transition-colors py-2 ${
+                                            resendTimer > 0 
+                                                ? 'text-charcoal/40 cursor-not-allowed' 
+                                                : 'text-spice hover:text-spice/80'
+                                        }`}
+                                    >
+                                        {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP to Email'}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStep(1);
+                                            setOtpDigits(['', '', '', '', '', '']);
+                                        }}
+                                        disabled={loading}
+                                        className="font-semibold text-charcoal/60 hover:text-charcoal transition-colors py-2"
+                                    >
+                                        Back to Login
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

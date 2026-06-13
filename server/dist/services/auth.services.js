@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePasswordService = exports.resetPasswordService = exports.verifyResetOTPService = exports.forgetPasswordService = exports.logoutService = exports.loginVendorStep2Service = exports.loginVendorService = exports.loginCustomerService = exports.registerVendorService = exports.registerCustomerService = exports.verifyEmailOTPService = exports.verifyPhoneOTPService = void 0;
+exports.resendPhoneOTPService = exports.resendEmailOTPService = exports.changePasswordService = exports.resetPasswordService = exports.verifyResetOTPService = exports.forgetPasswordService = exports.logoutService = exports.loginVendorStep2Service = exports.loginVendorService = exports.loginCustomerService = exports.registerVendorService = exports.registerCustomerService = exports.verifyEmailOTPService = exports.verifyPhoneOTPService = void 0;
 const Customer_model_1 = require("../models/Customer.model");
 const User_model_1 = require("../models/User.model");
 const Vendor_model_1 = require("../models/Vendor.model");
@@ -159,7 +159,9 @@ const loginVendorService = async (emailOrPhone, password) => {
     }
     const vendor = await Vendor_model_1.Vendor.findOne({ userId: user._id });
     if (!vendor?.isPaymentDone) {
-        throw new api_error_1.ApiError(403, 'Registration fee not paid yet', [user._id.toString()]);
+        throw new api_error_1.ApiError(403, 'Registration fee not paid yet', [
+            user._id.toString(),
+        ]);
     }
     const emailOTP = (0, otp_1.generateOTP)();
     const emailOTPExpiry = (0, otp_1.getOTPExpiry)();
@@ -291,4 +293,57 @@ const changePasswordService = async (userId, oldPassword, newPassword) => {
     };
 };
 exports.changePasswordService = changePasswordService;
+const resendEmailOTPService = async (userId) => {
+    console.log("OTP service S");
+    const user = await User_model_1.User.findById(userId);
+    if (!user) {
+        throw new api_error_1.ApiError(404, 'User not found');
+    }
+    if (user.isEmailVerified === true) {
+        throw new api_error_1.ApiError(400, 'User is already verified to email');
+    }
+    const lastSentTime = user.emailOTPExpiry
+        ? new Date(user.emailOTPExpiry.getTime() - 10 * 60 * 1000) // expiry was set 10 min after send
+        : null;
+    if (lastSentTime && Date.now() - lastSentTime.getTime() < 60 * 1000) {
+        throw new api_error_1.ApiError(429, 'Please wait before requesting another OTP');
+    }
+    const emailOTP = (0, otp_1.generateOTP)();
+    const emailOTPExpiry = (0, otp_1.getOTPExpiry)();
+    user.emailOTP = emailOTP;
+    user.emailOTPExpiry = emailOTPExpiry;
+    await user.save();
+    await (0, email_1.sendEmailOTP)(user.email, emailOTP);
+    return {
+        userId: user._id,
+        message: 'OTP is send to email',
+    };
+};
+exports.resendEmailOTPService = resendEmailOTPService;
+const resendPhoneOTPService = async (userId) => {
+    const user = await User_model_1.User.findById(userId);
+    if (!user) {
+        throw new api_error_1.ApiError(400, 'User not found');
+    }
+    if (user.isPhoneVerified === true) {
+        throw new api_error_1.ApiError(404, 'User is already verified to phone');
+    }
+    const lastSentTime = user.phoneOTPExpiry
+        ? new Date(user.phoneOTPExpiry.getTime() - 10 * 60 * 1000) // expiry was set 10 min after send
+        : null;
+    if (lastSentTime && Date.now() - lastSentTime.getTime() < 60 * 1000) {
+        throw new api_error_1.ApiError(429, 'Please wait before requesting another OTP');
+    }
+    const phoneOTP = (0, otp_1.generateOTP)();
+    const phoneOTPExpiry = (0, otp_1.getOTPExpiry)();
+    user.phoneOTP = phoneOTP;
+    user.phoneOTPExpiry = phoneOTPExpiry;
+    await user.save();
+    await (0, phone_1.sendPhoneOTP)(user.phone, phoneOTP);
+    return {
+        userId: user._id,
+        message: 'OTP is send to phone',
+    };
+};
+exports.resendPhoneOTPService = resendPhoneOTPService;
 //# sourceMappingURL=auth.services.js.map

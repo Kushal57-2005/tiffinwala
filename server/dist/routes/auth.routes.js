@@ -1,0 +1,21 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_controllers_1 = require("../controllers/auth.controllers");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const router = (0, express_1.Router)();
+router.post('/register/customer', auth_controllers_1.registerCustomer);
+router.post('/register/vendor', auth_controllers_1.registerVendor);
+router.post('/verify-phone-otp', auth_controllers_1.verifyPhoneOTP);
+router.post('/verify-email-otp', auth_controllers_1.verifyEmailOTP);
+router.post('/login/customer', auth_controllers_1.loginCustomer);
+router.post('/login/vendor', auth_controllers_1.loginVendorStep1);
+router.post('/login/vendor/verify-otp', auth_controllers_1.loginVendorStep2);
+router.post('/logout', auth_controllers_1.logout);
+router.get('/me', auth_middleware_1.authMiddleware, auth_controllers_1.getMe);
+router.post('/forget-password', auth_controllers_1.forgetPassword);
+router.post('/verify-reset-otp', auth_controllers_1.verifyResetOTP);
+router.post('/reset-password', auth_controllers_1.resetPassword);
+router.post('/change-password', auth_middleware_1.authMiddleware, auth_controllers_1.changePassword);
+exports.default = router;
+//# sourceMappingURL=auth.routes.js.map

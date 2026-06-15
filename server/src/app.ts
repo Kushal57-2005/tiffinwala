@@ -9,10 +9,7 @@ import cors from 'cors';
 const app = express();
 app.use(
     cors({
-        origin: [
-            'http://localhost:5173',
-            'https://tiffinwala-kjfo.onrender.com',
-        ],
+        origin: ['http://localhost:5173', 'https://tiffinwala-kkw.vercel.app'],
         credentials: true,
     }),
 );

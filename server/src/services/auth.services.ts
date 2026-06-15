@@ -279,7 +279,9 @@ export const loginVendorStep2Service = async (
 };
 
 export const logoutService = async (res: Response) => {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                         process.env.RENDER === 'true' || 
+                         !!(process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost'));
     res.clearCookie('token', {
         httpOnly: true,
         secure: isProduction,

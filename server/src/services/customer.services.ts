@@ -8,7 +8,7 @@ export const getNearbyVendorService = async (userId: string) => {
         throw new ApiError(404, 'Customer not found');
     }
 
-    const [lng, lat] = customer.location.coordinates;
+    const [lng = 0, lat = 0] = customer.location.coordinates || [];
 
     if (lng === 0 && lat === 0) {
         throw new ApiError(400, 'Please set your location first');
@@ -55,6 +55,46 @@ export const getNearbyVendorService = async (userId: string) => {
     });
 
     return nearbyVendors;
+};
+
+export const updateCustomerLocationService = async (
+    userId: string,
+    address: string | undefined,
+    coordinates: [number, number],
+) => {
+    if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+        throw new ApiError(400, 'Valid coordinates are required');
+    }
+
+    const [lat, lng] = coordinates.map(Number);
+    if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        (lat === 0 && lng === 0)
+    ) {
+        throw new ApiError(400, 'Please choose a valid location');
+    }
+
+    const updateData: Record<string, any> = {
+        'location.type': 'Point',
+        'location.coordinates': [lng, lat],
+    };
+
+    if (address && address.trim()) {
+        updateData['location.address'] = address.trim();
+    }
+
+    const customer = await Customer.findOneAndUpdate(
+        { userId },
+        { $set: updateData },
+        { new: true, runValidators: true },
+    ).populate('userId', 'firstName lastName email phone');
+
+    if (!customer) {
+        throw new ApiError(404, 'Customer not found');
+    }
+
+    return customer;
 };
 
 export const searchVendorsService = async (query: string) => {

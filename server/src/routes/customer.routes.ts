@@ -4,6 +4,7 @@ import { requireRole } from '../middlewares/role.middleware';
 import {
     getNearbyVendors,
     getCustomerProfile,
+    updateCustomerLocation,
     getVendorMenuForCustomer,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
@@ -15,6 +16,12 @@ router.get(
     authMiddleware,
     requireRole('customer'),
     getCustomerProfile,
+);
+router.patch(
+    '/profile/location',
+    authMiddleware,
+    requireRole('customer'),
+    updateCustomerLocation,
 );
 router.get(
     '/vendors/nearby',

@@ -124,6 +124,9 @@ export default function CustomerHome({
     const [loading, setLoading] = useState(true);
     const [menuLoading, setMenuLoading] = useState(false);
     const [locationError, setLocationError] = useState<string | null>(null);
+    const [customerAddress, setCustomerAddress] = useState('');
+    const [settingLocation, setSettingLocation] = useState(false);
+    const [nearbyReloadKey, setNearbyReloadKey] = useState(0);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -205,6 +208,7 @@ export default function CustomerHome({
                     setCustomerName(fullName);
                     setWalletBalance(profile.walletBalance || 0);
                     setFriendProfiles(profile.friendProfiles || []);
+                    setCustomerAddress(profile.location?.address || '');
                 }
             } catch (err) {
                 console.error('Error fetching customer profile:', err);
@@ -212,6 +216,53 @@ export default function CustomerHome({
         };
         fetchProfile();
     }, []);
+
+    const handleSetCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            setLocationError('Your browser does not support location access.');
+            return;
+        }
+
+        setSettingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    const res = await api.patch('/customer/profile/location', {
+                        address: customerAddress || 'Current location',
+                        location: {
+                            type: 'Point',
+                            coordinates: [latitude, longitude],
+                        },
+                    });
+
+                    if (res.data.success) {
+                        setCustomerAddress(
+                            res.data.data.location?.address ||
+                                customerAddress ||
+                                'Current location',
+                        );
+                        setLocationError(null);
+                        setNearbyReloadKey((key) => key + 1);
+                    }
+                } catch (err: any) {
+                    setLocationError(
+                        err.response?.data?.message ||
+                            'Failed to update location. Please try again.',
+                    );
+                } finally {
+                    setSettingLocation(false);
+                }
+            },
+            () => {
+                setLocationError(
+                    'Location permission was denied. Please allow location access and try again.',
+                );
+                setSettingLocation(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000 },
+        );
+    };
 
     // Load nearby or search vendors with 400ms debounce
     useEffect(() => {
@@ -259,7 +310,7 @@ export default function CustomerHome({
         }, 400);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]);
+    }, [searchQuery, nearbyReloadKey]);
 
     // Toggle filter chip selection
     const toggleFilter = (filter: string) => {
@@ -1085,10 +1136,13 @@ export default function CustomerHome({
                                     {locationError}
                                 </p>
                                 <button
-                                    onClick={() => alert('Profile settings screen placeholder')}
-                                    className="px-6 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                                    onClick={handleSetCurrentLocation}
+                                    disabled={settingLocation}
+                                    className="px-6 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Set Location In Settings
+                                    {settingLocation
+                                        ? 'Setting Location...'
+                                        : 'Use Current Location'}
                                 </button>
                             </div>
                         ) : loading ? (

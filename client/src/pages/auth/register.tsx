@@ -422,10 +422,21 @@ export default function Register() {
         if (role === 'vendor') {
             payload.businessName = businessName;
         } else {
+            if (
+                lat === '' ||
+                lng === '' ||
+                (Number(lat) === 0 && Number(lng) === 0)
+            ) {
+                setError('Please choose a valid delivery location on the map.');
+                setLoading(false);
+                setIsLatching(false);
+                return;
+            }
+
             payload.address = address;
             payload.location = {
                 type: 'Point',
-                coordinates: [lat === '' ? 0 : lat, lng === '' ? 0 : lng]
+                coordinates: [lat, lng]
             };
         }
 
@@ -1029,7 +1040,12 @@ export default function Register() {
                                     !password ||
                                     !confirmPassword ||
                                     (role === 'vendor' && !businessName) ||
-                                    (role === 'customer' && (!address || lat === '' || lng === ''))
+                                    (role === 'customer' &&
+                                        (!address ||
+                                            lat === '' ||
+                                            lng === '' ||
+                                            (Number(lat) === 0 &&
+                                                Number(lng) === 0)))
                                 }
                                 onMouseEnter={() => setBtnHovered(true)}
                                 onMouseLeave={() => setBtnHovered(false)}

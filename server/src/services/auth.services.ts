@@ -66,6 +66,15 @@ export const registerCustomerService = async (
     },
     address: string,
 ) => {
+    const [lat, lng] = location.coordinates.map(Number);
+    if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        (lat === 0 && lng === 0)
+    ) {
+        throw new ApiError(400, 'Please choose a valid location');
+    }
+
     const existedUser = await User.findOne({
         $or: [{ phone }, { email }],
     });
@@ -97,10 +106,7 @@ export const registerCustomerService = async (
         userId: user._id,
         location: {
             type: 'Point',
-            coordinates: [
-                location.coordinates[1],
-                location.coordinates[0],
-            ],
+            coordinates: [lng, lat],
             address: address,
         },
     });

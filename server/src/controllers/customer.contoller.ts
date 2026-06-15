@@ -1,4 +1,7 @@
-import { getNearbyVendorService } from '../services/customer.services';
+import {
+    getNearbyVendorService,
+    updateCustomerLocationService,
+} from '../services/customer.services';
 import { getTodayMenuService } from '../services/vendor.services';
 import { Customer } from '../models/Customer.model';
 import { asyncHandler } from '../utils/async-handler';
@@ -32,6 +35,24 @@ export const getCustomerProfile = asyncHandler(
         return res
             .status(200)
             .json(new ApiResponse(200, customer, 'Customer profile fetched'));
+    },
+);
+
+export const updateCustomerLocation = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const { address, location, coordinates } = req.body;
+        const locationCoordinates = location?.coordinates || coordinates;
+
+        const result = await updateCustomerLocationService(
+            userId,
+            address,
+            locationCoordinates,
+        );
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Customer location updated'));
     },
 );
 

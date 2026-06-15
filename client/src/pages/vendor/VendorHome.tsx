@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
 import { api } from '../../utils/api';
 
@@ -276,6 +278,19 @@ export default function VendorHome({
     initialIsOpen = true,
     initialOrders = DEFAULT_ORDERS,
 }: VendorHomeProps) {
+    const navigate = useNavigate();
+    const storeLogout = useAuthStore((state) => state.logout);
+
+    const handleLogout = async () => {
+        try {
+            await storeLogout();
+            navigate('/login');
+        } catch (err) {
+            console.error('Logout failed:', err);
+            navigate('/login');
+        }
+    };
+
     // ==========================================
     // LOCAL STATES
     // ==========================================
@@ -1106,6 +1121,27 @@ export default function VendorHome({
                                 </div>
                             )}
                         </div>
+
+                        {/* Logout Button */}
+                        <button
+                            onClick={handleLogout}
+                            title="Log Out"
+                            className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/20 border border-charcoal/10 flex items-center justify-center text-charcoal/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
+                        >
+                            <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                                />
+                            </svg>
+                        </button>
                     </div>
                 </header>
 

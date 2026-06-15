@@ -49,7 +49,7 @@ const verifyEmailOTPService = async (userId, otp) => {
     return { message: 'Email Verified Successfully' };
 };
 exports.verifyEmailOTPService = verifyEmailOTPService;
-const registerCustomerService = async (firstName, lastName, age, phone, email, password) => {
+const registerCustomerService = async (firstName, lastName, age, phone, email, password, location, address) => {
     const existedUser = await User_model_1.User.findOne({
         $or: [{ phone }, { email }],
     });
@@ -75,6 +75,14 @@ const registerCustomerService = async (firstName, lastName, age, phone, email, p
     });
     await Customer_model_1.Customer.create({
         userId: user._id,
+        location: {
+            type: 'Point',
+            coordinates: [
+                location.coordinates[1],
+                location.coordinates[0],
+            ],
+            address: address,
+        },
     });
     await (0, phone_1.sendPhoneOTP)(phone, phoneOTP);
     await (0, email_1.sendEmailOTP)(email, emailOTP);
@@ -294,7 +302,6 @@ const changePasswordService = async (userId, oldPassword, newPassword) => {
 };
 exports.changePasswordService = changePasswordService;
 const resendEmailOTPService = async (userId) => {
-    console.log("OTP service S");
     const user = await User_model_1.User.findById(userId);
     if (!user) {
         throw new api_error_1.ApiError(404, 'User not found');

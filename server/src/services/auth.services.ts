@@ -60,6 +60,11 @@ export const registerCustomerService = async (
     phone: string,
     email: string,
     password: string,
+    location: {
+        type: 'Point';
+        coordinates: [number, number];
+    },
+    address: string,
 ) => {
     const existedUser = await User.findOne({
         $or: [{ phone }, { email }],
@@ -90,6 +95,14 @@ export const registerCustomerService = async (
 
     await Customer.create({
         userId: user._id,
+        location: {
+            type: 'Point',
+            coordinates: [
+                location.coordinates[1],
+                location.coordinates[0],
+            ],
+            address: address,
+        },
     });
 
     await sendPhoneOTP(phone, phoneOTP);

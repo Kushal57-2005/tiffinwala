@@ -27,11 +27,11 @@ exports.verifyEmailOTP = (0, async_handler_1.asyncHandler)(async (req, res) => {
         .json(new api_response_1.ApiResponse(200, result, 'Email Verified'));
 });
 exports.registerCustomer = (0, async_handler_1.asyncHandler)(async (req, res) => {
-    const { firstName, lastName, age, phone, email, password } = req.body;
-    if (!firstName || !lastName || !age || !phone || !email || !password) {
-        throw new api_error_1.ApiError(400, 'All fields are required');
+    const { firstName, lastName, age, phone, email, password, location, address } = req.body;
+    if (!firstName || !lastName || !age || !phone || !email || !password || !location || !address) {
+        throw new api_error_1.ApiError(400, 'All fields are required (including address and location)');
     }
-    const result = await (0, auth_services_1.registerCustomerService)(firstName, lastName, age, phone, email, password);
+    const result = await (0, auth_services_1.registerCustomerService)(firstName, lastName, age, phone, email, password, location, address);
     return res
         .status(201)
         .json(new api_response_1.ApiResponse(201, result, 'Registration successful'));
@@ -133,7 +133,6 @@ exports.changePassword = (0, async_handler_1.asyncHandler)(async (req, res) => {
         .json(new api_response_1.ApiResponse(200, result, 'Password changed successfully'));
 });
 exports.resendEmailOTP = (0, async_handler_1.asyncHandler)(async (req, res) => {
-    console.log('OTP c is s');
     const { userId } = req.body;
     if (!userId) {
         throw new api_error_1.ApiError(400, 'userId is required');

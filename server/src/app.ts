@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import authRoutes from './routes/auth.routes';
 import paymentRoutes from './routes/payment.routes';
+import vendorRoutes from './routes/vendor.routes';
+import customerRoutes from './routes/customer.routes';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -20,6 +22,8 @@ app.get('/', (req: Request, res: Response) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/vendor', vendorRoutes);
+app.use('/api/customer', customerRoutes);
 
 // Global Error Handler Middleware
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
@@ -29,7 +33,7 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
         success: false,
         statusCode,
         message,
-        errors: err.errors || []
+        errors: err.errors || [],
     });
 });
 

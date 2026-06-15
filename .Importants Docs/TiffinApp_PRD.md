@@ -35,9 +35,10 @@
 ### Key Differentiators
 
 - Multi-profile per customer account (roommate/friend splits under one login)
+- Direct tiffin ordering — no connection/approval step, customer requests any vendor instantly
 - Coupon-based subscription system (use when you want, no forced daily deduction)
 - Dual monthly tally dashboard for both vendor and customer
-- Real-time chat between vendor and customer
+- Real-time chat between vendor and customer (unlocked on first order request)
 - Auto monthly bill email + PDF summary
 
 ---
@@ -67,8 +68,9 @@
 ### 3.1 Customer
 
 - Can have multiple **friend profiles** under one account
-- Can connect to multiple vendors
-- Can order via wallet money or subscription tokens
+- Can directly request a tiffin order from any vendor — no connection/approval step needed to order
+- Can additionally request a **"Monthly Billing" connection** with a vendor (vendor must accept) — unlocks pay-later option for that vendor's orders
+- Can order via wallet money or subscription tokens (immediate payment), or — if connected — add the bill to monthly dues
 - Has monthly dashboard + bill summary
 
 ### 3.2 Vendor
@@ -129,19 +131,20 @@ First Name → Last Name → Age
 
 - Nearby vendors list (based on customer location)
 - Search vendors by name/area
-- **My Vendors** section (connected vendors shown first)
+- **My Vendors** section (vendors customer has ordered from at least once — shown first)
 - Each vendor card shows:
   - Name, rating, avg price, open/closed status
   - Today's menu with tiffin description (tiffin / parcel mentioned by vendor)
-  - "Connect" button for new vendors
-  - "Order" button for connected vendors
+  - "Order" button — directly request a tiffin from any vendor (first-time or repeat)
 
 ### 5.2 Ordering
 
 - Select tiffin → choose quantity
 - Split across friend profiles (eg. 1 for Siddesh, 1 for Pranav)
 - Add order note (eg. "less spicy", "extra roti")
-- Choose payment: Wallet or Subscription Token
+- Choose payment:
+  - **Wallet** or **Subscription Token** (immediate deduction), OR
+  - **Add to Monthly Bill** — only shown if customer has an accepted "Monthly Billing" connection with this vendor; no deduction now, amount added to pending dues
 - Confirm → Request sent to vendor
 
 ### 5.3 History Page
@@ -166,8 +169,9 @@ First Name → Last Name → Age
   - Total amount spent
   - Bill per vendor (breakdown)
   - Profile splits (Siddesh ate X tiffins worth ₹Y, Pranav ate...)
+  - **Pending Dues** — per connected vendor, amount added to "Monthly Bill" not yet paid, with a **"Pay Now"** button (pays from wallet immediately, reduces pendingDue)
 - Monthly bill PDF download button
-- Auto email sent every month end
+- Auto email sent every month end (includes any pendingDue settled that month)
 
 ### 5.6 Profile
 
@@ -176,7 +180,7 @@ First Name → Last Name → Age
 
 ### 5.7 Messaging Page
 
-- Real-time chat with connected vendors (Socket.io)
+- Real-time chat unlocked with a vendor as soon as customer sends a tiffin request (order placed) — no separate connection step needed
 - Raise complaints inside chat
 - Complaint status tracked: Raised → Acknowledged → Resolved
 
@@ -199,7 +203,7 @@ First Name → Last Name → Age
 - Upload today's tiffin menu:
   - Description (mentions tiffin/parcel, price, quantity limit)
   - Max quantity per session
-- List of today's incoming orders
+- List of today's incoming **tiffin order requests** (this is the only "request" in the app — customers order directly, no prior connection needed)
 - Accept / Reject each order
 
 ### 6.2 History Page
@@ -207,11 +211,18 @@ First Name → Last Name → Age
 - All previous orders with customer name, profile, quantity, amount, date
 - Filter by date range
 
-### 6.3 Request Page
+### 6.3 Order Requests Page
 
-- Incoming connection requests from customers
-- Accept → phone numbers exchanged, customer added to My Customers
-- Reject → request dismissed
+- Full list of incoming tiffin order requests (pending / accepted / rejected)
+- Accept → order confirmed, customer notified, chat unlocked with that customer
+  - If order's payment mode is "Monthly Bill" → add amount to that customer's `pendingDue` under this vendor's connection
+- Reject → request dismissed, customer notified
+
+### 6.3a My Customers Page (Credit Connections)
+
+- Incoming "Monthly Billing" connection requests from customers — Accept / Reject
+- List of accepted connections with each customer's current `pendingDue`
+- Vendor can see at a glance which customers owe how much this month
 
 ### 6.4 Subscription Page
 
@@ -247,8 +258,7 @@ First Name → Last Name → Age
 
 ### 6.8 Notifications (Bell Icon)
 
-- New connection request from customer
-- New order received
+- New tiffin order request received
 - Due bill payment reminder (when ₹9999 balance hits 0)
 - New message from customer
 
@@ -269,6 +279,15 @@ First Name → Last Name → Age
 - Payment via wallet
 - Coupons/tokens credited to customer's account for that vendor
 
+### 7.2a Monthly Billing (Credit) System
+
+- Customer sends a "Monthly Billing" connection request to a vendor → vendor accepts/rejects
+- Once accepted, at checkout customer can choose **"Add to Monthly Bill"** instead of paying immediately
+- Order amount is added to `pendingDue` on that connection (no wallet/token deduction at order time)
+- Customer can pay off `pendingDue` anytime via **"Pay Now"** button (deducts from wallet)
+- At month-end, any remaining `pendingDue` is auto-settled from wallet as part of the monthly bill, then reset to ₹0
+- If wallet balance is insufficient at month-end → `pendingDue` carries forward, customer notified
+
 ### 7.3 Vendor Platform Fee
 
 - ₹9999 held by platform at registration
@@ -281,17 +300,24 @@ First Name → Last Name → Age
 ## 8. Booking Flow
 
 ```
-Customer opens vendor on home page
+Customer browses vendors on home page (location/search)
+→ Selects any vendor (no prior connection needed)
 → Views today's menu
 → Selects tiffin + quantity
 → Splits across friend profiles
 → Adds optional note
-→ Chooses payment (Wallet / Token)
+→ Chooses payment:
+   - Wallet / Token (immediate), OR
+   - "Add to Monthly Bill" (only if Monthly Billing connection accepted with this vendor)
 → Confirms → Request sent to Vendor
-→ Vendor sees request on home page
+   → Chat with this vendor unlocks immediately (even before accept)
+→ Vendor sees request on home page / Order Requests page
 → Vendor Accepts / Rejects
-→ If Accepted → Customer notified "Tiffin Confirmed ✅"
-   Customer's wallet/token deducted
+→ If Accepted:
+   - Customer notified "Tiffin Confirmed ✅"
+   - If Wallet/Token → deducted now
+   - If Monthly Bill → added to pendingDue
+   - Vendor added to customer's "My Vendors"
 → Vendor marks "Delivered"
 → Customer confirms "Received"
 → Order closed ✅
@@ -326,7 +352,7 @@ Customer opens vendor on home page
 ## 10. Real-Time Chat
 
 - Built with **Socket.io**
-- Available only between connected vendor-customer pairs
+- Unlocked between a customer and vendor as soon as the customer sends a tiffin order request to that vendor (no separate connection/approval needed)
 - Features:
   - Text messages
   - Complaint flow inside chat (customer types complaint → vendor responds)
@@ -351,12 +377,11 @@ Customer opens vendor on home page
 
 ### Vendor Notifications
 
-| Event                  | Trigger                |
-| ---------------------- | ---------------------- |
-| New Connection Request | Customer sends request |
-| New Order              | Customer places order  |
-| Due Bill Reminder      | ₹9999 balance hits ₹0  |
-| New Message            | Customer sends message |
+| Event             | Trigger                |
+| ----------------- | ---------------------- |
+| New Order Request | Customer places order  |
+| Due Bill Reminder | ₹9999 balance hits ₹0  |
+| New Message       | Customer sends message |
 
 ---
 
@@ -400,7 +425,7 @@ interface ICustomer extends IUser {
   location: { lat: number; lng: number; address: string };
   walletBalance: number;
   friendProfiles: IFriendProfile[];
-  connectedVendors: ObjectId[];
+  myVendors: ObjectId[]; // auto-added when first order is placed with a vendor
 }
 
 // Friend Profile
@@ -444,10 +469,21 @@ interface IOrder {
   profiles: { profileId: ObjectId; quantity: number }[];
   totalQuantity: number;
   totalAmount: number;
-  paymentMethod: "wallet" | "token";
+  paymentMethod: "wallet" | "token" | "monthly"; // "monthly" = added to pendingDue
+  isSettled: boolean; // true once paid (immediately for wallet/token, later for monthly)
   note?: string;
   status: "pending" | "accepted" | "rejected" | "delivered" | "received";
   customerLocation: { lat: number; lng: number };
+  createdAt: Date;
+}
+
+// Connection (Monthly Billing / Credit relationship)
+interface IConnection {
+  _id: ObjectId;
+  customerId: ObjectId;
+  vendorId: ObjectId;
+  status: "pending" | "accepted" | "rejected";
+  pendingDue: number; // accumulated unpaid "Add to Monthly Bill" orders
   createdAt: Date;
 }
 
@@ -464,21 +500,13 @@ interface ISubscription {
   isActive: boolean;
 }
 
-// Connection Request
-interface IConnectionRequest {
-  _id: ObjectId;
-  customerId: ObjectId;
-  vendorId: ObjectId;
-  status: "pending" | "accepted" | "rejected";
-  createdAt: Date;
-}
-
 // Message
 interface IMessage {
   _id: ObjectId;
   senderId: ObjectId;
   receiverId: ObjectId;
-  connectionId: ObjectId;
+  customerId: ObjectId; // the customer side of this chat pair
+  vendorId: ObjectId;   // the vendor side of this chat pair
   text: string;
   complaintStatus?: "raised" | "acknowledged" | "resolved";
   isComplaint: boolean;
@@ -540,7 +568,7 @@ GET    /api/auth/me
 ```
 GET    /api/customer/vendors/nearby        # home page vendors
 GET    /api/customer/vendors/search        # search
-GET    /api/customer/my-vendors            # connected vendors
+GET    /api/customer/my-vendors            # vendors customer has ordered from
 GET    /api/customer/history               # order history
 GET    /api/customer/subscriptions         # my subscriptions
 GET    /api/customer/dashboard             # stats with filter
@@ -570,12 +598,15 @@ PUT    /api/orders/:id/delivered           # vendor marks delivered
 PUT    /api/orders/:id/received            # customer confirms received
 ```
 
-### Connections
+### Connections (Monthly Billing / Credit)
 
 ```
-POST   /api/connections/request            # customer sends request
+POST   /api/connections/request            # customer requests monthly billing with a vendor
 PUT    /api/connections/:id/accept         # vendor accepts
 PUT    /api/connections/:id/reject         # vendor rejects
+GET    /api/connections/my                 # customer: list of accepted connections + pendingDue
+GET    /api/connections/customers          # vendor: list of connected customers + their pendingDue
+POST   /api/connections/:id/pay-due        # customer pays off pendingDue now (from wallet)
 ```
 
 ### Subscriptions
@@ -596,7 +627,8 @@ POST   /api/payments/razorpay-webhook      # payment webhook
 ### Chat
 
 ```
-GET    /api/chat/:connectionId             # fetch chat history
+GET    /api/chat/:vendorId                 # fetch chat history with a vendor (customer side)
+                                            # or with a customer (vendor side)
 POST   /api/chat/complaint                 # mark message as complaint
 PUT    /api/chat/complaint/:id/status      # update complaint status
 ```
@@ -636,6 +668,7 @@ GET    /api/bills/monthly/pdf              # download PDF
 - [ ] Menu upload by vendor (open/close toggle, quantity limit, sessions)
 - [ ] Booking flow (quantity + friend profile split + order notes + request → accept → confirm)
 - [ ] Wallet payment + token-based payment
+- [ ] Monthly Billing (Credit) connections — request/accept, "Add to Monthly Bill" option, pendingDue + Pay Now
 - [ ] Delivery confirmation (vendor delivered + customer received)
 - [ ] Subscription + coupon system + token color indicator
 - [ ] Basic notification bell (order confirmed, request accepted, token low, expiry warning)
@@ -649,7 +682,7 @@ GET    /api/bills/monthly/pdf              # download PDF
 ### 🚀 Phase 2 — Enhanced Experience
 
 - [ ] Real-time chat (Socket.io) with complaint flow inside chat
-- [ ] Vendor request/connection page (full flow)
+- [ ] Vendor "Order Requests" page (full accept/reject flow)
 - [ ] Vendor subscription management page (customer token tracking)
 - [ ] History page (both vendor + customer)
 - [ ] Vendor earnings detailed page
@@ -681,7 +714,8 @@ tiffinwala/
 │   │   │   ├── vendor/
 │   │   │   │   ├── Home.tsx
 │   │   │   │   ├── History.tsx
-│   │   │   │   ├── Requests.tsx
+│   │   │   │   ├── OrderRequests.tsx
+│   │   │   │   ├── MyCustomers.tsx
 │   │   │   │   ├── Subscriptions.tsx
 │   │   │   │   ├── Dashboard.tsx
 │   │   │   │   ├── Earnings.tsx
@@ -711,8 +745,8 @@ tiffinwala/
 │   │   │   ├── Vendor.ts
 │   │   │   ├── MenuItem.ts
 │   │   │   ├── Order.ts
-│   │   │   ├── Subscription.ts
 │   │   │   ├── Connection.ts
+│   │   │   ├── Subscription.ts
 │   │   │   ├── Message.ts
 │   │   │   ├── Rating.ts
 │   │   │   ├── Notification.ts

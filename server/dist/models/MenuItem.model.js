@@ -33,24 +33,46 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Customer = void 0;
+exports.MenuItem = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-const friendProfileSchema = new mongoose_1.Schema({ name: { type: String, required: true, trim: true } }, { timestamps: true });
-const customerSchema = new mongoose_1.Schema({
-    userId: {
-        type: mongoose_1.default.Types.ObjectId,
-        ref: 'User',
+const TierSchema = new mongoose_1.Schema({
+    name: { type: String, required: true, trim: true },
+    items: {
+        type: [String],
         required: true,
-        trim: true,
+        validate: {
+            validator: (arr) => arr.length > 0,
+            message: 'At least one item is required in tier',
+        },
     },
-    location: {
-        type: { type: String, enum: ['Point'], default: 'Point' },
-        coordinates: { type: [Number], default: [0, 0] },
-        address: { type: String, default: ' ' },
+    price: { type: Number, required: true },
+    maxQuantity: { type: Number, required: true },
+    remainingQuantity: { type: Number, required: true },
+}, { _id: false });
+const AddOnSchema = new mongoose_1.Schema({
+    name: { type: String, required: true, trim: true },
+    price: { type: Number, required: true },
+}, { _id: false });
+const MenuItemSchema = new mongoose_1.Schema({
+    vendorId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'Vendor',
+        required: true,
     },
-    walletBalance: { type: Number, default: 0 },
-    friendProfiles: { type: [friendProfileSchema], default: [] },
+    session: { type: String, enum: ['lunch', 'dinner'], required: true },
+    tiers: {
+        type: [TierSchema],
+        required: true,
+        validate: {
+            validator: (arr) => arr.length > 0,
+            message: 'At least one tier is required',
+        },
+    },
+    addOns: { type: [AddOnSchema], default: [] },
+    description: { type: String, default: '', trim: true },
+    date: { type: Date, required: true },
+    isExpired: { type: Boolean, required: true },
 }, { timestamps: true });
-customerSchema.index({ location: '2dsphere' });
-exports.Customer = mongoose_1.default.model('Customer', customerSchema);
-//# sourceMappingURL=Customer.model.js.map
+MenuItemSchema.index({ vendorId: 1, session: 1, date: 1 }, { unique: true });
+exports.MenuItem = mongoose_1.default.model('MenuItem', MenuItemSchema);
+//# sourceMappingURL=MenuItem.model.js.map

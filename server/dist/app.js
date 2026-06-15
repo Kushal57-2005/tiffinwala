@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
+const vendor_routes_1 = __importDefault(require("./routes/vendor.routes"));
+const customer_routes_1 = __importDefault(require("./routes/customer.routes"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const cors_1 = __importDefault(require("cors"));
 const app = (0, express_1.default)();
@@ -20,6 +22,8 @@ app.get('/', (req, res) => {
 });
 app.use('/api/auth', auth_routes_1.default);
 app.use('/api/payments', payment_routes_1.default);
+app.use('/api/vendor', vendor_routes_1.default);
+app.use('/api/customer', customer_routes_1.default);
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {
     const statusCode = err.statusCode || 500;
@@ -28,7 +32,7 @@ app.use((err, req, res, next) => {
         success: false,
         statusCode,
         message,
-        errors: err.errors || []
+        errors: err.errors || [],
     });
 });
 exports.default = app;

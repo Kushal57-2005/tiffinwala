@@ -53,9 +53,9 @@ export const verifyEmailOTP = asyncHandler(
 
 export const registerCustomer = asyncHandler(
     async (req: Request, res: Response) => {
-        const { firstName, lastName, age, phone, email, password } = req.body;
-        if (!firstName || !lastName || !age || !phone || !email || !password) {
-            throw new ApiError(400, 'All fields are required');
+        const { firstName, lastName, age, phone, email, password, location, address } = req.body;
+        if (!firstName || !lastName || !age || !phone || !email || !password || !location || !address) {
+            throw new ApiError(400, 'All fields are required (including address and location)');
         }
 
         const result = await registerCustomerService(
@@ -65,6 +65,8 @@ export const registerCustomer = asyncHandler(
             phone,
             email,
             password,
+            location,
+            address,
         );
 
         return res

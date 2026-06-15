@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/static-components */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -112,6 +112,200 @@ const FloatingInput = ({
     );
 };
 
+// ==========================================
+// INTERACTIVE MAP PICKER COMPONENT (LEAFLET)
+// ==========================================
+
+interface MapPickerProps {
+    lat: number;
+    lng: number;
+    onChange: (lat: number, lng: number) => void;
+    address?: string;
+}
+
+function MapPicker({ lat, lng, onChange, address }: MapPickerProps) {
+    const mapRef = useRef<HTMLDivElement>(null);
+    const mapInstance = useRef<any>(null);
+    const markerInstance = useRef<any>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [geocoding, setGeocoding] = useState(false);
+
+    // Load Leaflet dynamically
+    useEffect(() => {
+        if ((window as any).L) {
+            setIsLoaded(true);
+            return;
+        }
+
+        // Add Leaflet CSS
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+        link.crossOrigin = '';
+        document.head.appendChild(link);
+
+        // Add Leaflet JS
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+        script.crossOrigin = '';
+        script.onload = () => {
+            setIsLoaded(true);
+        };
+        document.body.appendChild(script);
+    }, []);
+
+    // Get browser location if coords are 0/empty
+    useEffect(() => {
+        if (lat === 0 && lng === 0 && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    onChange(position.coords.latitude, position.coords.longitude);
+                },
+                (error) => {
+                    console.error("Error getting location", error);
+                }
+            );
+        }
+    }, [lat, lng, isLoaded]);
+
+    // Initialize Map
+    useEffect(() => {
+        if (!isLoaded || !mapRef.current) return;
+        const L = (window as any).L;
+        if (!L) return;
+
+        const initialLat = lat || 19.0760; // Mumbai default
+        const initialLng = lng || 72.8777;
+
+        if (mapInstance.current) {
+            mapInstance.current.remove();
+            mapInstance.current = null;
+            markerInstance.current = null;
+        }
+
+        const map = L.map(mapRef.current, {
+            zoomControl: true,
+        }).setView([initialLat, initialLng], 13);
+        mapInstance.current = map;
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Custom SVG Marker (Green Leaf theme aligned)
+        const customIcon = L.divIcon({
+            className: 'custom-leaflet-marker',
+            html: `
+                <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; transform: translate(0px, 0px);">
+                    <div style="position: absolute; width: 14px; height: 14px; background-color: rgba(92, 122, 82, 0.4); border-radius: 50%; animation: ripple-ring-green 1.5s infinite ease-out; top: 9px; left: 9px; pointer-events: none;"></div>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style="filter: drop-shadow(0px 3px 4px rgba(0,0,0,0.25)); position: relative; z-index: 10;">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#5C7A52"/>
+                    </svg>
+                </div>
+            `,
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+        });
+
+        const marker = L.marker([initialLat, initialLng], {
+            draggable: true,
+            icon: customIcon
+        }).addTo(map);
+        markerInstance.current = marker;
+
+        marker.on('dragend', () => {
+            const pos = marker.getLatLng();
+            onChange(pos.lat, pos.lng);
+        });
+
+        map.on('click', (e: any) => {
+            const pos = e.latlng;
+            marker.setLatLng(pos);
+            onChange(pos.lat, pos.lng);
+        });
+
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 350);
+
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+                markerInstance.current = null;
+            }
+        };
+    }, [isLoaded]);
+
+    // Handle lat/lng prop changes from outside (e.g. geocoder)
+    useEffect(() => {
+        if (mapInstance.current && markerInstance.current) {
+            const currentLatLng = markerInstance.current.getLatLng();
+            const targetLat = lat || 19.0760;
+            const targetLng = lng || 72.8777;
+
+            if (Math.abs(currentLatLng.lat - targetLat) > 0.0001 || Math.abs(currentLatLng.lng - targetLng) > 0.0001) {
+                markerInstance.current.setLatLng([targetLat, targetLng]);
+                mapInstance.current.setView([targetLat, targetLng], mapInstance.current.getZoom());
+            }
+        }
+    }, [lat, lng]);
+
+    const locateAddress = async () => {
+        if (!address || address.trim() === '') return;
+        setGeocoding(true);
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
+            );
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const result = data[0];
+                onChange(Number(result.lat), Number(result.lon));
+            } else {
+                alert('Could not locate address on map. Please position pin manually.');
+            }
+        } catch (error) {
+            console.error('Geocoding error:', error);
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    return (
+        <div className="space-y-2 select-none">
+            <div className="flex justify-between items-center">
+                <span className="text-[10px] text-charcoal/50 font-bold uppercase tracking-wider font-body">
+                    Delivery Location Pin
+                </span>
+                {address && address.trim().length > 3 && (
+                    <button
+                        type="button"
+                        onClick={locateAddress}
+                        disabled={geocoding}
+                        className="text-[10px] text-[#5C7A52] hover:underline font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50 font-body"
+                    >
+                        {geocoding ? 'Locating...' : 'Locate Address on Map'}
+                    </button>
+                )}
+            </div>
+            
+            <div 
+                ref={mapRef} 
+                className="w-full h-40 rounded-2xl border border-charcoal/15 overflow-hidden shadow-inner bg-charcoal/5 z-0"
+            />
+            
+            <div className="flex justify-between text-[9px] text-charcoal/50 font-semibold font-body px-1">
+                <span>Lat: {lat ? lat.toFixed(6) : '0.000000'}</span>
+                <span>Lng: {lng ? lng.toFixed(6) : '0.000000'}</span>
+                <span className="text-[#5C7A52] font-bold">Drag pin or click map to reposition</span>
+            </div>
+        </div>
+    );
+}
+
 export default function Register() {
     const navigate = useNavigate();
 
@@ -125,6 +319,9 @@ export default function Register() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [businessName, setBusinessName] = useState('');
+    const [address, setAddress] = useState('');
+    const [lat, setLat] = useState<number | ''>('');
+    const [lng, setLng] = useState<number | ''>('');
 
     // UI Visual States
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -224,6 +421,12 @@ export default function Register() {
 
         if (role === 'vendor') {
             payload.businessName = businessName;
+        } else {
+            payload.address = address;
+            payload.location = {
+                type: 'Point',
+                coordinates: [lat === '' ? 0 : lat, lng === '' ? 0 : lng]
+            };
         }
 
         setTimeout(async () => {
@@ -461,6 +664,11 @@ export default function Register() {
                 .floating-leaf { animation: float-slow 7s ease-in-out infinite; }
                 .floating-anise { animation: float-medium 9s ease-in-out infinite; }
                 .floating-cardamom { animation: float-slow 6s ease-in-out infinite; }
+                
+                @keyframes ripple-ring-green {
+                    0% { transform: scale(0.7); opacity: 0.8; }
+                    100% { transform: scale(2.4); opacity: 0; }
+                }
                 
                 .metal-shimmer {
                     background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 100%);
@@ -761,6 +969,28 @@ export default function Register() {
                                 role={role}
                             />
 
+                            {role === 'customer' && (
+                                <>
+                                    <FloatingInput
+                                        label="Delivery Address"
+                                        type="text"
+                                        value={address}
+                                        onChange={(e) => setAddress(e.target.value)}
+                                        disabled={loading}
+                                        role={role}
+                                    />
+                                    <MapPicker
+                                        lat={lat === '' ? 0 : lat}
+                                        lng={lng === '' ? 0 : lng}
+                                        onChange={(newLat, newLng) => {
+                                            setLat(newLat);
+                                            setLng(newLng);
+                                        }}
+                                        address={address}
+                                    />
+                                </>
+                            )}
+
                             <div className="flex space-x-3">
                                 <FloatingInput
                                     label="Password"
@@ -798,7 +1028,8 @@ export default function Register() {
                                     !email ||
                                     !password ||
                                     !confirmPassword ||
-                                    (role === 'vendor' && !businessName)
+                                    (role === 'vendor' && !businessName) ||
+                                    (role === 'customer' && (!address || lat === '' || lng === ''))
                                 }
                                 onMouseEnter={() => setBtnHovered(true)}
                                 onMouseLeave={() => setBtnHovered(false)}

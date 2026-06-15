@@ -15,7 +15,6 @@ export interface ICustomer extends Document {
     };
     walletBalance: number;
     friendProfiles: IFriendProfile[];
-    connectedVendors: mongoose.Types.ObjectId[];
 }
 
 const friendProfileSchema = new Schema<IFriendProfile>(
@@ -38,7 +37,6 @@ const customerSchema = new Schema<ICustomer>(
         },
         walletBalance: { type: Number, default: 0 },
         friendProfiles: { type: [friendProfileSchema], default: [] },
-        connectedVendors: [{ type: Schema.Types.ObjectId, ref: 'Vendor' }],
     },
     { timestamps: true },
 );

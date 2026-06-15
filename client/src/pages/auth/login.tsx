@@ -127,6 +127,9 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [otpToast, setOtpToast] = useState<{
+        emailOTP?: string;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
 
     const [resendTimer, setResendTimer] = useState(0);
@@ -138,6 +141,18 @@ export default function Login() {
             return () => clearTimeout(timer);
         }
     }, [resendTimer]);
+
+    useEffect(() => {
+        if (!otpToast) return;
+        const timer = setTimeout(() => setOtpToast(null), 60000);
+        return () => clearTimeout(timer);
+    }, [otpToast]);
+
+    const showOtpToast = (data: any) => {
+        if (data?.emailOTP) {
+            setOtpToast({ emailOTP: data.emailOTP });
+        }
+    };
 
     const [step, setStep] = useState(1);
     const [userId, setUserId] = useState('');
@@ -241,6 +256,7 @@ export default function Login() {
                     password,
                 });
                 setUserId(res.data.data.userId);
+                showOtpToast(res.data.data);
                 setStep(2);
             } catch (err: any) {
                 if (
@@ -400,6 +416,7 @@ export default function Login() {
         setSuccess('');
         try {
             const res = await api.post('/auth/resend-email-otp', { userId });
+            showOtpToast(res.data.data);
             setSuccess(res.data.message || 'OTP resent to email successfully');
             setOtpDigits(['', '', '', '', '', '']);
             setResendTimer(30);
@@ -417,6 +434,17 @@ export default function Login() {
             onMouseMove={handleMouseMove}
             className="min-h-screen flex items-center justify-center font-body bg-cream p-4 relative overflow-hidden transition-all duration-700"
         >
+            {otpToast && (
+                <div className="fixed top-4 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-spice/25 bg-[#FBF4EC]/95 p-4 text-charcoal shadow-2xl backdrop-blur-md font-body">
+                    <div className="text-[10px] font-bold uppercase text-spice tracking-wider mb-2">
+                        OTP for testing
+                    </div>
+                    <div className="text-sm font-semibold">Email OTP: {otpToast.emailOTP}</div>
+                    <div className="mt-2 text-[11px] text-charcoal/55">
+                        This message stays for 1 minute.
+                    </div>
+                </div>
+            )}
             {/* Background Ambient Glows - Shifts based on role */}
             <div className="absolute inset-0 pointer-events-none z-0">
                 <div

@@ -12,8 +12,6 @@ export const sendEmailOTP = async (
     email: string,
     otp: string,
 ): Promise<void> => {
-    console.log('sending...email');
-    console.log(`📭 Email OTP for ${email}: ${otp}`);
     try {
         await transporter.sendMail({
             from: `"TiffinWala" <${process.env.SMTP_USER}>`,
@@ -23,9 +21,8 @@ export const sendEmailOTP = async (
                <p>Your OTP is: <strong>${otp}</strong></p>`,
         });
 
-        console.log('✅ Email sent');
     } catch (error) {
-        console.error('❌ Email failed:', error);
+        console.error('Email OTP failed:', error);
     }
 };
 

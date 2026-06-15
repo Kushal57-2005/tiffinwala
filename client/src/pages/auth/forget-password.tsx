@@ -1,4 +1,5 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -52,6 +53,9 @@ export default function ForgetPassword() {
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [otpToast, setOtpToast] = useState<{
+        emailOTP?: string;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Multi-step: 1 = Request OTP Form, 2 = Verify OTP Grid
@@ -60,6 +64,18 @@ export default function ForgetPassword() {
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [btnHovered, setBtnHovered] = useState(false);
     const [btnOtpHovered, setBtnOtpHovered] = useState(false);
+
+    useEffect(() => {
+        if (!otpToast) return;
+        const timer = setTimeout(() => setOtpToast(null), 60000);
+        return () => clearTimeout(timer);
+    }, [otpToast]);
+
+    const showOtpToast = (data: any) => {
+        if (data?.emailOTP) {
+            setOtpToast({ emailOTP: data.emailOTP });
+        }
+    };
 
     // Track cursor movement for parallax floating elements
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -111,6 +127,7 @@ export default function ForgetPassword() {
 
         try {
             const res = await api.post('/auth/forget-password', { email });
+            showOtpToast(res.data.data);
             setSuccess(res.data.message || 'OTP sent successfully!');
             setOtpDigits(['', '', '', '', '', '']);
             setStep(2); // Go to verification
@@ -160,6 +177,17 @@ export default function ForgetPassword() {
             onMouseMove={handleMouseMove}
             className="min-h-screen flex items-center justify-center font-body bg-cream p-4 relative overflow-hidden transition-all duration-700"
         >
+            {otpToast && (
+                <div className="fixed top-4 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-cinnamon/25 bg-[#FBF4EC]/95 p-4 text-charcoal shadow-2xl backdrop-blur-md font-body">
+                    <div className="text-[10px] font-bold uppercase text-cinnamon tracking-wider mb-2">
+                        OTP for testing
+                    </div>
+                    <div className="text-sm font-semibold">Email OTP: {otpToast.emailOTP}</div>
+                    <div className="mt-2 text-[11px] text-charcoal/55">
+                        This message stays for 1 minute.
+                    </div>
+                </div>
+            )}
             {/* Background Ambient Glows */}
             <div className="absolute inset-0 pointer-events-none z-0">
                 <div

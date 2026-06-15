@@ -116,6 +116,8 @@ export const registerCustomerService = async (
 
     return {
         userId: user._id,
+        phoneOTP,
+        emailOTP,
         message: 'OTP is send to email and phone',
     };
 };
@@ -163,6 +165,8 @@ export const registerVendorService = async (
 
     return {
         userId: user._id,
+        phoneOTP,
+        emailOTP,
         message: 'OTP sent to your phone and email',
     };
 };
@@ -238,6 +242,7 @@ export const loginVendorService = async (
 
     return {
         userId: user._id,
+        emailOTP,
         message: 'OTP sent to your email',
     };
 };
@@ -300,6 +305,7 @@ export const forgetPasswordService = async (email: string) => {
 
     return {
         userId: user._id,
+        emailOTP,
         message: 'OTP sent to your email for password reset',
     };
 };
@@ -432,6 +438,7 @@ export const resendEmailOTPService = async (userId: string) => {
 
     return {
         userId: user._id,
+        emailOTP,
         message: 'OTP is send to email',
     };
 };
@@ -465,6 +472,7 @@ export const resendPhoneOTPService = async (userId: string) => {
 
     return {
         userId: user._id,
+        phoneOTP,
         message: 'OTP is send to phone',
     };
 };

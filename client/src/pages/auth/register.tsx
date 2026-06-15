@@ -328,6 +328,10 @@ export default function Register() {
 
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [otpToast, setOtpToast] = useState<{
+        phoneOTP?: string;
+        emailOTP?: string;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Multi-step: 1 = Register Form, 2 = Phone OTP, 3 = Email OTP
@@ -351,6 +355,23 @@ export default function Register() {
             return () => clearTimeout(timer);
         }
     }, [emailTimer]);
+
+    useEffect(() => {
+        if (!otpToast) return;
+        const timer = setTimeout(() => setOtpToast(null), 60000);
+        return () => clearTimeout(timer);
+    }, [otpToast]);
+
+    const showOtpToast = (data: any) => {
+        const nextToast = {
+            phoneOTP: data?.phoneOTP,
+            emailOTP: data?.emailOTP,
+        };
+
+        if (nextToast.phoneOTP || nextToast.emailOTP) {
+            setOtpToast(nextToast);
+        }
+    };
 
     // UI Visual States
     const [showPassword, setShowPassword] = useState(false);
@@ -445,6 +466,7 @@ export default function Register() {
                 const endpoint = role === 'customer' ? '/auth/register/customer' : '/auth/register/vendor';
                 const res = await api.post(endpoint, payload);
                 setUserId(res.data.data.userId);
+                showOtpToast(res.data.data);
                 setOtpDigits(['', '', '', '', '', '']);
                 setStep(2); // Move to Phone OTP step
             } catch (err: any) {
@@ -523,6 +545,7 @@ export default function Register() {
         setSuccess('');
         try {
             const res = await api.post('/auth/resend-phone-otp', { userId });
+            showOtpToast(res.data.data);
             setSuccess(res.data.message || 'OTP resent to phone successfully');
             setOtpDigits(['', '', '', '', '', '']);
             setPhoneTimer(30);
@@ -540,6 +563,7 @@ export default function Register() {
         setSuccess('');
         try {
             const res = await api.post('/auth/resend-email-otp', { userId });
+            showOtpToast(res.data.data);
             setSuccess(res.data.message || 'OTP resent to email successfully');
             setOtpDigits(['', '', '', '', '', '']);
             setEmailTimer(30);
@@ -643,6 +667,20 @@ export default function Register() {
             onMouseMove={handleMouseMove}
             className="min-h-screen flex items-center justify-center font-body bg-cream p-4 relative overflow-hidden transition-all duration-700"
         >
+            {otpToast && (
+                <div className="fixed top-4 right-4 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-leaf/25 bg-[#FBF4EC]/95 p-4 text-charcoal shadow-2xl backdrop-blur-md font-body">
+                    <div className="text-[10px] font-bold uppercase text-leaf tracking-wider mb-2">
+                        OTP for testing
+                    </div>
+                    <div className="space-y-1 text-sm font-semibold">
+                        {otpToast.phoneOTP && <div>Phone OTP: {otpToast.phoneOTP}</div>}
+                        {otpToast.emailOTP && <div>Email OTP: {otpToast.emailOTP}</div>}
+                    </div>
+                    <div className="mt-2 text-[11px] text-charcoal/55">
+                        This message stays for 1 minute.
+                    </div>
+                </div>
+            )}
             {/* Background Ambient Glows - Shifts based on role */}
             <div className="absolute inset-0 pointer-events-none z-0">
                 <div

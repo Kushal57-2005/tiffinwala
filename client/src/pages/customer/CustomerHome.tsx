@@ -281,7 +281,7 @@ export default function CustomerHome({
     const [orderQuantities, setOrderQuantities] = useState<
         Record<string, number>
     >({});
-    const [selectedFriend, setSelectedFriend] = useState('Myself');
+    const [selectedFriends, setSelectedFriends] = useState<string[]>(['Myself']);
     const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'token'>(
         'wallet',
     );
@@ -313,6 +313,27 @@ export default function CustomerHome({
     const [formAddress, setFormAddress] = useState('');
     const [formLat, setFormLat] = useState<number | ''>('');
     const [formLng, setFormLng] = useState<number | ''>('');
+
+    // Profile Modal tab state
+    const [modalTab, setModalTab] = useState<'profile' | 'friends'>('profile');
+
+    // Friends tab state
+    const [friends, setFriends] = useState<{ _id: string; name: string; phone?: string; nickname?: string }[]>([]);
+    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [friendsError, setFriendsError] = useState('');
+
+    // Friend inline form state
+    const [friendFormMode, setFriendFormMode] = useState<'add' | 'edit' | null>(null);
+    const [editingFriendId, setEditingFriendId] = useState<string | null>(null);
+    const [friendFormName, setFriendFormName] = useState('');
+    const [friendFormNickname, setFriendFormNickname] = useState('');
+    const [friendFormPhone, setFriendFormPhone] = useState('');
+    const [friendFormSubmitting, setFriendFormSubmitting] = useState(false);
+    const [friendFormError, setFriendFormError] = useState('');
+    const [friendFocused, setFriendFocused] = useState<string | null>(null);
+
+    // Delete confirmation state
+    const [deletingFriendId, setDeletingFriendId] = useState<string | null>(null);
 
     // Track cursor movement for parallax
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -366,6 +387,10 @@ export default function CustomerHome({
                     setCustomerName(fullName);
                     setWalletBalance(profile.walletBalance || 0);
                     setFriendProfiles(profile.friendProfiles || []);
+                    // Pre-populate friends list from profile response
+                    if (profile.friendProfiles?.length > 0) {
+                        setFriends(profile.friendProfiles);
+                    }
                     setCustomerAddress(profile.location?.address || '');
                     // Pre-populate profile form
                     setFormFirstname(profile.userId?.firstName || '');
@@ -384,6 +409,18 @@ export default function CustomerHome({
         };
         fetchProfile();
     }, []);
+
+    // Fetch friends when modal opens on friends tab
+    useEffect(() => {
+        if (showProfileModal && modalTab === 'friends') {
+            setFriendsLoading(true);
+            setFriendsError('');
+            api.get('/customer/friends')
+                .then(r => setFriends(r.data.data?.friendProfiles || r.data.data || []))
+                .catch(() => setFriendsError('Could not load friends. Please try again.'))
+                .finally(() => setFriendsLoading(false));
+        }
+    }, [showProfileModal, modalTab]);
 
     const handleSetCurrentLocation = () => {
         if (!navigator.geolocation) {
@@ -527,7 +564,7 @@ export default function CustomerHome({
         setShowDetailModal(true);
         setOrderSuccess(false);
         setOrderSubmitting(false);
-        setSelectedFriend('Myself');
+        setSelectedFriends(['Myself']);
         setPaymentMethod('wallet');
 
         setOrderQuantities({});
@@ -958,8 +995,8 @@ export default function CustomerHome({
                         <div className="flex items-center space-x-4">
                             {/* Interactive Avatar / Initials badge */}
                             <button
-                                onClick={() => setShowProfileModal(true)}
-                                title="Edit Profile Settings"
+                                onClick={() => { setShowProfileModal(true); setModalTab('profile'); setFriendFormMode(null); setDeletingFriendId(null); }}
+                                title="Edit Profile & Friends"
                                 className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
                             >
                                 <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
@@ -2029,36 +2066,47 @@ export default function CustomerHome({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#2B2118]/10 pt-4">
                                     {/* Friend Selector */}
                                     <div className="space-y-1.5 text-left">
-                                        <label className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider block font-body">
-                                            Who is this for?
+                                        <label className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider flex justify-between items-center font-body">
+                                            <span>Who is this for?</span>
+                                            {selectedVendor && selectedVendor.tiers.reduce((acc, t) => acc + (orderQuantities[t.name] || 0), 0) > 1 && (
+                                                <span className="text-[9px] text-[#5C7A52] lowercase font-semibold tracking-normal">
+                                                    (select up to {selectedVendor.tiers.reduce((acc, t) => acc + (orderQuantities[t.name] || 0), 0)})
+                                                </span>
+                                            )}
                                         </label>
-                                        <div className="relative">
-                                            <select
-                                                value={selectedFriend}
-                                                onChange={(e) =>
-                                                    setSelectedFriend(
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className="w-full bg-[#FBF4EC]/50 border border-charcoal/15 text-charcoal rounded-2xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 font-body shadow-inner cursor-pointer"
-                                            >
-                                                <option value="Myself">
-                                                    Myself ({customerName})
-                                                </option>
-                                                {friendProfiles.map(
-                                                    (friend: any) => (
-                                                        <option
-                                                            key={
-                                                                friend._id ||
-                                                                friend.name
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {['Myself', ...friendProfiles.map((f: any) => f.name)].map((name: string) => {
+                                                const isSelected = selectedFriends.includes(name);
+                                                return (
+                                                    <button
+                                                        key={name}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const totalTiffins = selectedVendor ? selectedVendor.tiers.reduce((acc, t) => acc + (orderQuantities[t.name] || 0), 0) : 0;
+                                                            if (totalTiffins <= 1) {
+                                                                setSelectedFriends([name]);
+                                                            } else {
+                                                                if (isSelected) {
+                                                                    if (selectedFriends.length > 1) {
+                                                                        setSelectedFriends(selectedFriends.filter(n => n !== name));
+                                                                    }
+                                                                } else {
+                                                                    if (selectedFriends.length < totalTiffins) {
+                                                                        setSelectedFriends([...selectedFriends, name]);
+                                                                    }
+                                                                }
                                                             }
-                                                            value={friend.name}
-                                                        >
-                                                            {friend.name}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
+                                                            isSelected
+                                                                ? 'bg-[#5C7A52] text-white border-[#5C7A52] shadow-sm'
+                                                                : 'bg-[#FBF4EC]/50 text-charcoal/70 border-charcoal/15 hover:border-[#5C7A52]/50 hover:bg-[#FBF4EC]'
+                                                        }`}
+                                                    >
+                                                        {name === 'Myself' ? `Myself (${customerName})` : name}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
@@ -2174,236 +2222,462 @@ export default function CustomerHome({
             )}
         </div>
 
+            {/* ==========================================
+                UNIFIED PROFILE MODAL (CENTERED)
+                Two tabs: My Profile | My Friends
+               ========================================== */}
             {showProfileModal && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B2118]/60 backdrop-blur-md transition-opacity duration-300"
-                    onClick={() => setShowProfileModal(false)}
+                    onClick={() => { setShowProfileModal(false); setFriendFormMode(null); setDeletingFriendId(null); }}
                 >
                     <div
                         className="bg-white/95 border border-white/30 shadow-[0_24px_70px_rgba(43,33,24,0.3)] rounded-[32px] w-full max-w-lg overflow-hidden transform transition-all duration-300 flex flex-col animate-scale-up"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Dark Header */}
-                        <div className="bg-gradient-to-br from-[#1F1710] to-[#2E2218] p-6 text-[#FBF4EC] relative select-none">
+                        <div className="bg-gradient-to-br from-[#1F1710] to-[#2E2218] px-6 pt-5 pb-8 rounded-t-[32px] relative overflow-hidden select-none">
                             <img
                                 src={tiffinBg}
                                 alt=""
                                 className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-luminosity pointer-events-none"
                             />
-                            <div className="relative z-10">
-                                <h3 className="font-display text-xl md:text-2xl font-bold">
-                                    Profile Settings
-                                </h3>
-                                <p className="text-xs text-[#FBF4EC]/60 mt-1">
-                                    Update your personal information and delivery address.
-                                </p>
+                            <div className="relative z-10 flex items-start justify-between">
+                                <div>
+                                    <h3 className="font-display text-2xl font-bold text-[#FBF4EC] mb-1 tracking-wide shadow-sm">
+                                        Your Account
+                                    </h3>
+                                    <p className="text-[#FBF4EC]/60 text-[11px] font-body leading-relaxed max-w-[280px]">
+                                        Manage your personal information, delivery address, and friends.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowProfileModal(false); setFriendFormMode(null); setDeletingFriendId(null); }}
+                                    className="text-[#FBF4EC]/40 hover:text-white transition-colors"
+                                >
+                                    <svg
+                                        className="w-5 h-5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </button>
                             </div>
+                        </div>
+
+                        {/* Tab Toggle */}
+                        <div className="flex bg-[#FBF4EC] p-1 rounded-2xl mx-6 -mt-5 relative z-20 shadow-sm border border-[#2B2118]/5">
                             <button
-                                onClick={() => setShowProfileModal(false)}
-                                className="absolute right-5 top-5 text-[#FBF4EC]/70 hover:text-white transition-colors z-20"
+                                onClick={() => { setModalTab('profile'); setFriendFormMode(null); setDeletingFriendId(null); }}
+                                className={`flex-1 py-2 text-xs font-bold font-body rounded-xl transition-all ${
+                                    modalTab === 'profile'
+                                        ? 'bg-white text-[#5C7A52] shadow-sm'
+                                        : 'text-[#2B2118]/50 hover:text-[#2B2118]'
+                                }`}
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                👤 My Profile
+                            </button>
+                            <button
+                                onClick={() => { 
+                                    setModalTab('friends'); 
+                                    setFriendFormMode(null); 
+                                    setDeletingFriendId(null); 
+                                }}
+                                className={`flex-1 py-2 text-xs font-bold font-body rounded-xl transition-all ${
+                                    modalTab === 'friends'
+                                        ? 'bg-white text-[#5C7A52] shadow-sm'
+                                        : 'text-[#2B2118]/50 hover:text-[#2B2118]'
+                                }`}
+                            >
+                                👥 My Friends
                             </button>
                         </div>
 
-                        {/* Form Body */}
-                        <form
-                            onSubmit={async (e) => {
-                                e.preventDefault();
-                                if (!formFirstname.trim() || !formLastname.trim()) {
-                                    setProfileError('First and Last names are required.');
-                                    return;
-                                }
-                                if (!formEmail.trim() || !formPhone.trim()) {
-                                    setProfileError('Email and Phone are required.');
-                                    return;
-                                }
-                                setProfileSubmitting(true);
-                                setProfileError('');
-                                try {
-                                    const payload: any = {
-                                        firstname: formFirstname,
-                                        lastname: formLastname,
-                                        email: formEmail,
-                                        phone: formPhone,
-                                        address: formAddress,
-                                    };
-                                    if (formLng !== '' && formLat !== '') {
-                                        payload.coordinates = [
-                                            Number(formLng),
-                                            Number(formLat),
-                                        ];
-                                    }
-                                    const res = await api.put('/customer/profile', payload);
-                                    const updated = res.data.data;
-                                    const fullName = updated.userId
-                                        ? `${updated.userId.firstName} ${updated.userId.lastName}`
-                                        : customerName;
-                                    setCustomerName(fullName);
-                                    setCustomerAddress(updated.location?.address || formAddress);
-                                    setFormFirstname(updated.userId?.firstName || '');
-                                    setFormLastname(updated.userId?.lastName || '');
-                                    setFormEmail(updated.userId?.email || '');
-                                    setFormPhone(updated.userId?.phone || '');
-                                    setFormAddress(updated.location?.address || '');
-                                    setFormLat(updated.location?.coordinates?.[1] ?? '');
-                                    setFormLng(updated.location?.coordinates?.[0] ?? '');
-                                    setShowProfileModal(false);
-                                } catch (err: any) {
-                                    setProfileError(
-                                        err.response?.data?.message || 'Failed to update profile. Please try again.',
-                                    );
-                                } finally {
-                                    setProfileSubmitting(false);
-                                }
-                            }}
-                            className="p-6 space-y-4 overflow-y-auto max-h-[72vh] bg-[#FBF4EC]/10 custom-scrollbar"
-                        >
-                            {/* Error banner */}
-                            {profileError && (
-                                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-xs flex items-start space-x-2 font-semibold">
-                                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <span>{profileError}</span>
-                                </div>
+                        {/* Modal Body */}
+                        <div className="p-6 overflow-y-auto max-h-[72vh] bg-[#FBF4EC]/30 custom-scrollbar">
+                            
+                            {/* ── MY PROFILE TAB ── */}
+                            {modalTab === 'profile' && (
+                                <form
+                                    className="space-y-4 animate-scale-up"
+                                    onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        if (!formFirstname.trim() || !formLastname.trim()) {
+                                            setProfileError('First and Last names are required.');
+                                            return;
+                                        }
+                                        if (!formEmail.trim() || !formPhone.trim()) {
+                                            setProfileError('Email and Phone are required.');
+                                            return;
+                                        }
+                                        setProfileSubmitting(true);
+                                        setProfileError('');
+                                        try {
+                                            const payload: any = {
+                                                firstname: formFirstname,
+                                                lastname: formLastname,
+                                                email: formEmail,
+                                                phone: formPhone,
+                                                address: formAddress,
+                                            };
+                                            if (formLng !== '' && formLat !== '') {
+                                                payload.coordinates = [Number(formLng), Number(formLat)];
+                                            }
+                                            const res = await api.put('/customer/profile', payload);
+                                            const updated = res.data.data;
+                                            const fullName = updated.userId
+                                                ? `${updated.userId.firstName} ${updated.userId.lastName}`
+                                                : customerName;
+                                            setCustomerName(fullName);
+                                            setCustomerAddress(updated.location?.address || formAddress);
+                                            setFormFirstname(updated.userId?.firstName || '');
+                                            setFormLastname(updated.userId?.lastName || '');
+                                            setFormEmail(updated.userId?.email || '');
+                                            setFormPhone(updated.userId?.phone || '');
+                                            setFormAddress(updated.location?.address || '');
+                                            setFormLat(updated.location?.coordinates?.[1] ?? '');
+                                            setFormLng(updated.location?.coordinates?.[0] ?? '');
+                                            setShowProfileModal(false);
+                                        } catch (err: any) {
+                                            setProfileError(err.response?.data?.message || 'Failed to update profile.');
+                                        } finally {
+                                            setProfileSubmitting(false);
+                                        }
+                                    }}
+                                >
+                                    {/* Error banner */}
+                                    {profileError && (
+                                        <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-xs flex items-start space-x-2 font-semibold">
+                                            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <span>{profileError}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Personal Details */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
+                                            Personal Details
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="relative w-full group">
+                                                <input type="text" value={formFirstname} onChange={(e) => setFormFirstname(e.target.value)} onFocus={() => setFocusedField('p-firstname')} onBlur={() => setFocusedField(null)}
+                                                    className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                                    placeholder="First Name" />
+                                                <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${focusedField === 'p-firstname' || formFirstname !== '' ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-4 text-sm text-[#2B2118]/60'}`}>First Name</label>
+                                            </div>
+                                            <div className="relative w-full group">
+                                                <input type="text" value={formLastname} onChange={(e) => setFormLastname(e.target.value)} onFocus={() => setFocusedField('p-lastname')} onBlur={() => setFocusedField(null)}
+                                                    className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                                    placeholder="Last Name" />
+                                                <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${focusedField === 'p-lastname' || formLastname !== '' ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-4 text-sm text-[#2B2118]/60'}`}>Last Name</label>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="relative w-full group">
+                                                <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} onFocus={() => setFocusedField('p-email')} onBlur={() => setFocusedField(null)}
+                                                    className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                                    placeholder="Email Address" />
+                                                <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${focusedField === 'p-email' || formEmail !== '' ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-4 text-sm text-[#2B2118]/60'}`}>Email Address</label>
+                                            </div>
+                                            <div className="relative w-full group">
+                                                <input type="text" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} onFocus={() => setFocusedField('p-phone')} onBlur={() => setFocusedField(null)}
+                                                    className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                                    placeholder="Phone Number" />
+                                                <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${focusedField === 'p-phone' || formPhone !== '' ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-4 text-sm text-[#2B2118]/60'}`}>Phone Number</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Delivery Address */}
+                                    <div className="space-y-3 pt-2">
+                                        <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
+                                            Delivery Address
+                                        </h4>
+                                        <div className="relative w-full group">
+                                            <input type="text" value={formAddress} onChange={(e) => setFormAddress(e.target.value)} onFocus={() => setFocusedField('p-address')} onBlur={() => setFocusedField(null)}
+                                                className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                                placeholder="Delivery Address" />
+                                            <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${focusedField === 'p-address' || formAddress !== '' ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-4 text-sm text-[#2B2118]/60'}`}>Delivery Address</label>
+                                        </div>
+                                        
+                                        <MapPicker
+                                            lat={formLat === '' ? 0 : Number(formLat)}
+                                            lng={formLng === '' ? 0 : Number(formLng)}
+                                            onChange={(lat, lng) => { setFormLat(lat); setFormLng(lng); }}
+                                            address={formAddress}
+                                        />
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="pt-4 flex gap-3">
+                                        <button type="button" onClick={() => setShowProfileModal(false)}
+                                            className="flex-1 py-3.5 rounded-2xl border border-[#2B2118]/15 text-[#2B2118]/70 hover:text-[#2B2118] hover:bg-[#2B2118]/5 font-bold text-sm transition-all select-none"
+                                        >Cancel</button>
+                                        <button type="submit" disabled={profileSubmitting}
+                                            className="flex-1 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] transition-all flex items-center justify-center space-x-2 select-none disabled:opacity-50"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                            <span>{profileSubmitting ? 'Saving...' : 'Save Settings'}</span>
+                                        </button>
+                                    </div>
+                                </form>
                             )}
 
-                            {/* Personal Details */}
-                            <div className="space-y-3">
-                                <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
-                                    Personal Details
-                                </h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {/* First Name */}
-                                    <div className="relative w-full group">
-                                        <input
-                                            type="text"
-                                            value={formFirstname}
-                                            onChange={(e) => setFormFirstname(e.target.value)}
-                                            onFocus={() => setFocusedField('p-firstname')}
-                                            onBlur={() => setFocusedField(null)}
-                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
-                                            placeholder="First Name"
-                                        />
-                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
-                                            focusedField === 'p-firstname' || formFirstname !== ''
-                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
-                                                : 'top-4 text-sm text-[#2B2118]/60'
-                                        }`}>First Name</label>
-                                    </div>
-                                    {/* Last Name */}
-                                    <div className="relative w-full group">
-                                        <input
-                                            type="text"
-                                            value={formLastname}
-                                            onChange={(e) => setFormLastname(e.target.value)}
-                                            onFocus={() => setFocusedField('p-lastname')}
-                                            onBlur={() => setFocusedField(null)}
-                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
-                                            placeholder="Last Name"
-                                        />
-                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
-                                            focusedField === 'p-lastname' || formLastname !== ''
-                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
-                                                : 'top-4 text-sm text-[#2B2118]/60'
-                                        }`}>Last Name</label>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {/* Email */}
-                                    <div className="relative w-full group">
-                                        <input
-                                            type="email"
-                                            value={formEmail}
-                                            onChange={(e) => setFormEmail(e.target.value)}
-                                            onFocus={() => setFocusedField('p-email')}
-                                            onBlur={() => setFocusedField(null)}
-                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
-                                            placeholder="Email Address"
-                                        />
-                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
-                                            focusedField === 'p-email' || formEmail !== ''
-                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
-                                                : 'top-4 text-sm text-[#2B2118]/60'
-                                        }`}>Email Address</label>
-                                    </div>
-                                    {/* Phone */}
-                                    <div className="relative w-full group">
-                                        <input
-                                            type="text"
-                                            value={formPhone}
-                                            onChange={(e) => setFormPhone(e.target.value)}
-                                            onFocus={() => setFocusedField('p-phone')}
-                                            onBlur={() => setFocusedField(null)}
-                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
-                                            placeholder="Phone Number"
-                                        />
-                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
-                                            focusedField === 'p-phone' || formPhone !== ''
-                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
-                                                : 'top-4 text-sm text-[#2B2118]/60'
-                                        }`}>Phone Number</label>
-                                    </div>
-                                </div>
-                            </div>
+                            {/* ── MY FRIENDS TAB ── */}
+                            {modalTab === 'friends' && (
+                                <div className="space-y-4 animate-scale-up">
 
-                            {/* Delivery Address */}
-                            <div className="space-y-3 pt-2">
-                                <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
-                                    Delivery Address
-                                </h4>
-                                <div className="relative w-full group">
-                                    <input
-                                        type="text"
-                                        value={formAddress}
-                                        onChange={(e) => setFormAddress(e.target.value)}
-                                        onFocus={() => setFocusedField('p-address')}
-                                        onBlur={() => setFocusedField(null)}
-                                        className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
-                                        placeholder="Delivery Address"
-                                    />
-                                    <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
-                                        focusedField === 'p-address' || formAddress !== ''
-                                            ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
-                                            : 'top-4 text-sm text-[#2B2118]/60'
-                                    }`}>Delivery Address</label>
+                                    {/* TODO: wire ProfileSelector to order modal */}
+                                    {/* Friend chip selector row (horizontal scroll preview) */}
+                                    {friends.length > 0 && (
+                                        <div>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-[#2B2118]/40 font-body mb-2">Quick Select</p>
+                                            <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                                <div className="flex gap-2 shrink-0">
+                                                    {friends.map(f => (
+                                                        <div key={f._id} className="flex flex-col items-center gap-1 shrink-0">
+                                                            <div className="w-10 h-10 rounded-xl bg-[#5C7A52]/15 border border-[#5C7A52]/20 flex items-center justify-center">
+                                                                <span className="text-sm font-display font-bold text-[#5C7A52]">{f.name.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                            <span className="text-[9px] text-[#2B2118]/60 font-body font-semibold max-w-[40px] truncate text-center">{f.nickname || f.name.split(' ')[0]}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="border-b border-[#2B2118]/8 mt-3" />
+                                        </div>
+                                    )}
+
+                                    {/* Loading */}
+                                    {friendsLoading && (
+                                        <div className="space-y-3">
+                                            {[1,2].map(i => <div key={i} className="h-20 rounded-2xl bg-[#2B2118]/6 animate-pulse" />)}
+                                        </div>
+                                    )}
+
+                                    {/* Error */}
+                                    {friendsError && !friendsLoading && (
+                                        <div className="p-3 rounded-2xl bg-red-500/10 border border-red-400/20 text-red-600 text-xs font-semibold font-body">{friendsError}</div>
+                                    )}
+
+                                    {/* Empty state */}
+                                    {!friendsLoading && !friendsError && friends.length === 0 && friendFormMode === null && (
+                                        <div className="flex flex-col items-center py-10 gap-3">
+                                            <svg width="64" height="64" viewBox="0 0 64 64" fill="none" className="opacity-30">
+                                                <rect x="8" y="20" width="48" height="32" rx="6" fill="#5C7A52" />
+                                                <rect x="14" y="14" width="36" height="10" rx="4" fill="#2B2118" opacity="0.5" />
+                                                <rect x="20" y="8" width="24" height="8" rx="3" fill="#2B2118" opacity="0.3" />
+                                                <line x1="8" y1="32" x2="56" y2="32" stroke="#FBF4EC" strokeWidth="2" opacity="0.4" />
+                                                <circle cx="32" cy="42" r="5" fill="#FBF4EC" opacity="0.5" />
+                                            </svg>
+                                            <p className="font-display font-bold text-[#2B2118]/40 text-base text-center">No friends added yet</p>
+                                            <p className="text-xs text-[#2B2118]/30 font-body text-center">Add a friend to split tiffin orders!</p>
+                                            <button
+                                                onClick={() => { setFriendFormMode('add'); setFriendFormName(''); setFriendFormNickname(''); setFriendFormPhone(''); setFriendFormError(''); }}
+                                                className="mt-1 px-5 py-2.5 rounded-xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white text-xs font-bold font-body shadow-[0_6px_20px_rgba(92,122,82,0.25)] transition-all"
+                                            >+ Add your first friend</button>
+                                        </div>
+                                    )}
+
+                                    {/* Friends list */}
+                                    {!friendsLoading && friends.length > 0 && (
+                                        <div className="space-y-3">
+                                            {friends.map(friend => (
+                                                <div key={friend._id}>
+                                                    {/* Friend card */}
+                                                    {(friendFormMode !== 'edit' || editingFriendId !== friend._id) && (
+                                                        <div className="bg-white/60 border border-white/50 rounded-2xl px-4 py-3.5 shadow-sm">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className="w-9 h-9 rounded-xl bg-[#5C7A52]/15 border border-[#5C7A52]/20 flex items-center justify-center shrink-0">
+                                                                        <span className="text-sm font-display font-bold text-[#5C7A52]">{friend.name.charAt(0).toUpperCase()}</span>
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <p className="font-display font-bold text-[#2B2118] text-sm leading-tight truncate">
+                                                                            {friend.name}{friend.nickname ? ` (${friend.nickname})` : ''}
+                                                                        </p>
+                                                                        <p className="text-[11px] text-[#2B2118]/50 font-body mt-0.5">
+                                                                            {friend.phone || 'No phone added'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                    {/* Edit */}
+                                                                    <button
+                                                                        onClick={() => { setFriendFormMode('edit'); setEditingFriendId(friend._id); setFriendFormName(friend.name); setFriendFormNickname(friend.nickname || ''); setFriendFormPhone(friend.phone || ''); setFriendFormError(''); setDeletingFriendId(null); }}
+                                                                        className="w-8 h-8 rounded-xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/15 flex items-center justify-center text-[#5C7A52] transition-all"
+                                                                        title="Edit friend"
+                                                                    >
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                    {/* Delete */}
+                                                                    <button
+                                                                        onClick={() => setDeletingFriendId(prev => prev === friend._id ? null : friend._id)}
+                                                                        className="w-8 h-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-400/15 flex items-center justify-center text-red-500 transition-all"
+                                                                        title="Delete friend"
+                                                                    >
+                                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Inline delete confirmation */}
+                                                            {deletingFriendId === friend._id && (
+                                                                <div className="mt-3 pt-3 border-t border-red-200/60 flex items-center justify-between gap-2 animate-scale-up">
+                                                                    <p className="text-xs text-red-600 font-semibold font-body">Remove {friend.name}?</p>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            onClick={() => setDeletingFriendId(null)}
+                                                                            className="px-3 py-1.5 rounded-lg border border-[#2B2118]/15 text-[#2B2118]/60 text-xs font-bold font-body hover:bg-[#2B2118]/5 transition-all"
+                                                                        >Cancel</button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    await api.delete(`/customer/friends/${friend._id}`);
+                                                                                    setDeletingFriendId(null);
+                                                                                    setFriendsLoading(true);
+                                                                                    const r = await api.get('/customer/friends');
+                                                                                    setFriends(r.data.data?.friendProfiles || r.data.data || []);
+                                                                                } catch { setFriendsError('Could not delete friend'); }
+                                                                                finally { setFriendsLoading(false); }
+                                                                            }}
+                                                                            className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold font-body transition-all"
+                                                                        >Remove</button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Inline edit form */}
+                                                    {friendFormMode === 'edit' && editingFriendId === friend._id && (
+                                                        <form
+                                                            className="bg-white/70 border border-[#5C7A52]/20 rounded-2xl px-4 py-4 shadow-sm space-y-3 animate-scale-up"
+                                                            onSubmit={async (e) => {
+                                                                e.preventDefault();
+                                                                if (!friendFormName.trim()) { setFriendFormError('Name is required'); return; }
+                                                                setFriendFormSubmitting(true); setFriendFormError('');
+                                                                try {
+                                                                    await api.put(`/customer/friends/${friend._id}`, { name: friendFormName, nickname: friendFormNickname, phone: friendFormPhone });
+                                                                    setFriendFormMode(null); setEditingFriendId(null);
+                                                                    setFriendsLoading(true);
+                                                                    const r = await api.get('/customer/friends');
+                                                                    setFriends(r.data.data?.friendProfiles || r.data.data || []);
+                                                                } catch { setFriendFormError('Could not update friend'); }
+                                                                finally { setFriendFormSubmitting(false); setFriendsLoading(false); }
+                                                            }}
+                                                        >
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C7A52] font-body">Edit Friend</p>
+                                                            {friendFormError && <p className="text-xs text-red-600 font-semibold">{friendFormError}</p>}
+                                                            {/* Name */}
+                                                            <div className="relative w-full">
+                                                                <input type="text" value={friendFormName} onChange={e => setFriendFormName(e.target.value)} onFocus={() => setFriendFocused('ef-name')} onBlur={() => setFriendFocused(null)}
+                                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                                    placeholder="Name" />
+                                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'ef-name' || friendFormName ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Name *</label>
+                                                            </div>
+                                                            {/* Nickname */}
+                                                            <div className="relative w-full">
+                                                                <input type="text" value={friendFormNickname} onChange={e => setFriendFormNickname(e.target.value)} onFocus={() => setFriendFocused('ef-nick')} onBlur={() => setFriendFocused(null)}
+                                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                                    placeholder="Nickname" />
+                                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'ef-nick' || friendFormNickname ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Nickname (optional)</label>
+                                                            </div>
+                                                            {/* Phone */}
+                                                            <div className="relative w-full">
+                                                                <input type="text" value={friendFormPhone} onChange={e => setFriendFormPhone(e.target.value)} onFocus={() => setFriendFocused('ef-phone')} onBlur={() => setFriendFocused(null)}
+                                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                                    placeholder="Phone" />
+                                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'ef-phone' || friendFormPhone ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Phone (optional)</label>
+                                                            </div>
+                                                            <div className="flex gap-2 pt-1">
+                                                                <button type="button" onClick={() => { setFriendFormMode(null); setEditingFriendId(null); }} className="flex-1 py-2.5 rounded-xl border border-[#2B2118]/15 text-[#2B2118]/60 hover:text-[#2B2118] hover:bg-[#2B2118]/5 text-xs font-bold font-body transition-all">Cancel</button>
+                                                                <button type="submit" disabled={friendFormSubmitting} className="flex-1 py-2.5 rounded-xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white text-xs font-bold font-body shadow-[0_4px_15px_rgba(92,122,82,0.25)] transition-all disabled:opacity-50">
+                                                                    {friendFormSubmitting ? 'Saving…' : 'Save Changes'}
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Inline Add Friend form */}
+                                    {friendFormMode === 'add' && (
+                                        <form
+                                            className="bg-white/70 border border-[#5C7A52]/25 rounded-2xl px-4 py-4 shadow-sm space-y-3 animate-scale-up"
+                                            onSubmit={async (e) => {
+                                                e.preventDefault();
+                                                if (!friendFormName.trim()) { setFriendFormError('Name is required'); return; }
+                                                setFriendFormSubmitting(true); setFriendFormError('');
+                                                try {
+                                                    await api.post('/customer/friends', { name: friendFormName, nickname: friendFormNickname, phone: friendFormPhone });
+                                                    setFriendFormMode(null);
+                                                    setFriendsLoading(true);
+                                                    const r = await api.get('/customer/friends');
+                                                    setFriends(r.data.data?.friendProfiles || r.data.data || []);
+                                                } catch { setFriendFormError('Could not add friend. Please try again.'); }
+                                                finally { setFriendFormSubmitting(false); setFriendsLoading(false); }
+                                            }}
+                                        >
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C7A52] font-body">New Friend</p>
+                                            {friendFormError && <p className="text-xs text-red-600 font-semibold font-body">{friendFormError}</p>}
+                                            <div className="relative w-full">
+                                                <input type="text" value={friendFormName} onChange={e => setFriendFormName(e.target.value)} onFocus={() => setFriendFocused('af-name')} onBlur={() => setFriendFocused(null)}
+                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                    placeholder="Name" autoFocus />
+                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'af-name' || friendFormName ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Name *</label>
+                                            </div>
+                                            <div className="relative w-full">
+                                                <input type="text" value={friendFormNickname} onChange={e => setFriendFormNickname(e.target.value)} onFocus={() => setFriendFocused('af-nick')} onBlur={() => setFriendFocused(null)}
+                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                    placeholder="Nickname" />
+                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'af-nick' || friendFormNickname ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Nickname (optional)</label>
+                                            </div>
+                                            <div className="relative w-full">
+                                                <input type="text" value={friendFormPhone} onChange={e => setFriendFormPhone(e.target.value)} onFocus={() => setFriendFocused('af-phone')} onBlur={() => setFriendFocused(null)}
+                                                    className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 pt-5 pb-1.5 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body placeholder-transparent"
+                                                    placeholder="Phone" />
+                                                <label className={`absolute left-4 pointer-events-none font-body transition-all duration-200 ${friendFocused === 'af-phone' || friendFormPhone ? 'top-1.5 text-[9px] font-bold uppercase tracking-wider text-[#5C7A52]' : 'top-3.5 text-sm text-[#2B2118]/50'}`}>Phone (optional)</label>
+                                            </div>
+                                            <div className="flex gap-2 pt-1">
+                                                <button type="button" onClick={() => setFriendFormMode(null)} className="flex-1 py-2.5 rounded-xl border border-[#2B2118]/15 text-[#2B2118]/60 hover:text-[#2B2118] hover:bg-[#2B2118]/5 text-xs font-bold font-body transition-all">Cancel</button>
+                                                <button type="submit" disabled={friendFormSubmitting} className="flex-1 py-2.5 rounded-xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white text-xs font-bold font-body shadow-[0_4px_15px_rgba(92,122,82,0.25)] transition-all disabled:opacity-50">
+                                                    {friendFormSubmitting ? 'Adding…' : '+ Add Friend'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
+
+                                    {/* Add Friend button (when list exists and form not open) */}
+                                    {!friendsLoading && friendFormMode === null && friends.length > 0 && (
+                                        <button
+                                            onClick={() => { setFriendFormMode('add'); setFriendFormName(''); setFriendFormNickname(''); setFriendFormPhone(''); setFriendFormError(''); }}
+                                            className="w-full py-3.5 rounded-2xl border-2 border-dashed border-[#5C7A52]/30 hover:border-[#5C7A52]/60 text-[#5C7A52] text-sm font-bold font-body transition-all duration-200 flex items-center justify-center gap-2 hover:bg-[#5C7A52]/5"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Add Friend
+                                        </button>
+                                    )}
                                 </div>
-
-                                <MapPicker
-                                    lat={formLat === '' ? 0 : Number(formLat)}
-                                    lng={formLng === '' ? 0 : Number(formLng)}
-                                    onChange={(lat, lng) => {
-                                        setFormLat(lat);
-                                        setFormLng(lng);
-                                    }}
-                                    address={formAddress}
-                                />
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="pt-4 flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowProfileModal(false)}
-                                    className="flex-1 py-3.5 rounded-2xl border border-[#2B2118]/15 text-[#2B2118]/70 hover:text-[#2B2118] hover:bg-[#2B2118]/5 font-bold text-sm transition-all select-none"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={profileSubmitting}
-                                    className="flex-1 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] transition-all flex items-center justify-center space-x-2 select-none disabled:opacity-50"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    <span>{profileSubmitting ? 'Saving...' : 'Save Settings'}</span>
-                                </button>
-                            </div>
-                        </form>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

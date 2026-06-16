@@ -7,6 +7,10 @@ import {
     updateCustomerLocation,
     updateCustomerProfile,
     getVendorMenuForCustomer,
+    getFriendProfiles,
+    addFriendProfile,
+    editFriendProfile,
+    removeFriendProfile,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
 
@@ -40,6 +44,31 @@ router.get(
     authMiddleware,
     requireRole('customer'),
     getVendorMenuForCustomer,
+);
+
+router.get(
+    '/friends',
+    authMiddleware,
+    requireRole('customer'),
+    getFriendProfiles,
+);
+router.post(
+    '/friends',
+    authMiddleware,
+    requireRole('customer'),
+    addFriendProfile,
+);
+router.put(
+    '/friends/:friendId',
+    authMiddleware,
+    requireRole('customer'),
+    editFriendProfile,
+);
+router.delete(
+    '/friends/:friendId',
+    authMiddleware,
+    requireRole('customer'),
+    removeFriendProfile,
 );
 
 export default router;

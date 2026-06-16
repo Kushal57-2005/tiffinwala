@@ -3,6 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IFriendProfile {
     _id?: mongoose.Types.ObjectId;
     name: string;
+    phone?: string;
+    nickname?: string;
     createdAt?: Date;
 }
 
@@ -14,12 +16,16 @@ export interface ICustomer extends Document {
         address: string;
     };
     walletBalance: number;
-    friendProfiles: IFriendProfile[];
+    friendProfiles: mongoose.Types.DocumentArray<IFriendProfile>;
 }
 
-const friendProfileSchema = new Schema<IFriendProfile>(
-    { name: { type: String, required: true, trim: true } },
-    { timestamps: true },
+const FriendProfileSchema = new Schema<IFriendProfile>(
+    {
+        name: { type: String, required: true, trim: true },
+        phone: { type: String, trim: true },
+        nickname: { type: String, trim: true },
+    },
+    { _id: true },
 );
 
 const customerSchema = new Schema<ICustomer>(
@@ -36,7 +42,7 @@ const customerSchema = new Schema<ICustomer>(
             address: { type: String, default: ' ' },
         },
         walletBalance: { type: Number, default: 0 },
-        friendProfiles: { type: [friendProfileSchema], default: [] },
+        friendProfiles: { type: [FriendProfileSchema], default: [] },
     },
     { timestamps: true },
 );

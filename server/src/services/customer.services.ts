@@ -219,3 +219,62 @@ export const updateCustomerProfileService = async (
 
     return customer;
 };
+
+export const addFriendProfileService = async (
+    userId: string,
+    name: string,
+    phone?: string,
+    nickname?: string,
+) => {
+    const customer = await Customer.findOne({ userId });
+    if (!customer) throw new ApiError(404, 'Customer not found');
+
+    customer.friendProfiles.push({ name, phone, nickname });
+    await customer.save();
+
+    return customer.friendProfiles;
+};
+
+export const editFriendProfileService = async (
+    userId: string,
+    friendId: string,
+    name?: string,
+    phone?: string,
+    nickname?: string,
+) => {
+    const customer = await Customer.findOne({ userId });
+    if (!customer) throw new ApiError(404, 'Customer not found');
+
+    const friend = customer.friendProfiles.id(friendId);
+    if (!friend) throw new ApiError(404, 'Friend profile not found');
+
+    if (name) friend.name = name;
+    if (phone !== undefined) friend.phone = phone;
+    if (nickname !== undefined) friend.nickname = nickname;
+
+    await customer.save();
+    return customer.friendProfiles;
+};
+
+export const removeFriendProfileService = async (
+    userId: string,
+    friendId: string,
+) => {
+    const customer = await Customer.findOne({ userId });
+    if (!customer) throw new ApiError(404, 'Customer not found');
+
+    const friend = customer.friendProfiles.id(friendId);
+    if (!friend) throw new ApiError(404, 'Friend profile not found');
+
+    friend.deleteOne();
+    await customer.save();
+    
+    return customer.friendProfiles;
+};
+
+export const getFriendProfilesService = async (userId: string) => {
+    const customer = await Customer.findOne({ userId });
+    if (!customer) throw new ApiError(404, 'Customer not found');
+
+    return customer.friendProfiles;
+};

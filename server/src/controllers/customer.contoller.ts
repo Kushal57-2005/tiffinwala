@@ -1,6 +1,10 @@
 import {
+    addFriendProfileService,
+    editFriendProfileService,
     getCustomerProfileService,
+    getFriendProfilesService,
     getNearbyVendorService,
+    removeFriendProfileService,
     updateCustomerLocationService,
     updateCustomerProfileService,
 } from '../services/customer.services';
@@ -108,5 +112,66 @@ export const getVendorProfile = asyncHandler(
         return res
             .status(200)
             .json(new ApiResponse(200, result, 'Customers profile fetched'));
+    },
+);
+
+export const getFriendProfiles = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const result = await getFriendProfilesService(userId);
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Friend profiles fetched'));
+    },
+);
+
+export const addFriendProfile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const { name, phone, nickname } = req.body;
+
+        if (!name?.trim()) {
+            throw new ApiError(400, 'Friend name is required');
+        }
+
+        const result = await addFriendProfileService(
+            userId,
+            name,
+            phone,
+            nickname,
+        );
+        return res
+            .status(201)
+            .json(new ApiResponse(201, result, 'Friend profile added'));
+    },
+);
+
+export const editFriendProfile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const friendId = req.params.friendId as string;
+        const { name, phone, nickname } = req.body;
+
+        const result = await editFriendProfileService(
+            userId,
+            friendId,
+            name,
+            phone,
+            nickname,
+        );
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Friend profile updated'));
+    },
+);
+
+export const removeFriendProfile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const friendId = req.params.friendId as string;
+        const result = await removeFriendProfileService(userId, friendId);
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Friend profile removed'));
     },
 );

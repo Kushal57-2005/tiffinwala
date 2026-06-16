@@ -279,9 +279,13 @@ export const loginVendorStep2Service = async (
 };
 
 export const logoutService = async (res: Response) => {
-    const isProduction = process.env.NODE_ENV === 'production' || 
-                         process.env.RENDER === 'true' || 
-                         !!(process.env.CLIENT_URL && !process.env.CLIENT_URL.includes('localhost'));
+    const isProduction =
+        process.env.NODE_ENV === 'production' ||
+        process.env.RENDER === 'true' ||
+        !!(
+            process.env.CLIENT_URL &&
+            !process.env.CLIENT_URL.includes('localhost')
+        );
     res.clearCookie('token', {
         httpOnly: true,
         secure: isProduction,
@@ -415,10 +419,6 @@ export const resendEmailOTPService = async (userId: string) => {
     const user = await User.findById(userId);
     if (!user) {
         throw new ApiError(404, 'User not found');
-    }
-
-    if (user.isEmailVerified === true) {
-        throw new ApiError(400, 'User is already verified to email');
     }
 
     const lastSentTime = user.emailOTPExpiry

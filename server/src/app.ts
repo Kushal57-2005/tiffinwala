@@ -37,4 +37,8 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
     });
 });
 
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+});
 export default app;

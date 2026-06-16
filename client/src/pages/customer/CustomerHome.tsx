@@ -64,38 +64,42 @@ const SAMPLE_MY_VENDORS = [
     },
 ];
 
-
-
 // Helper to map backend vendor object to frontend Vendor interface
 const mapBackendVendor = (v: any): Vendor => {
     const ownerName = v.userInfo
         ? `${v.userInfo.firstName} ${v.userInfo.lastName}`
         : v.userId
-        ? `${v.userId.firstName} ${v.userId.lastName}`
-        : 'Unknown Vendor';
+          ? `${v.userId.firstName} ${v.userId.lastName}`
+          : 'Unknown Vendor';
 
-    const distanceKm = typeof v.distanceInMeters === 'number'
-        ? parseFloat((v.distanceInMeters / 1000).toFixed(1))
-        : 0;
+    const distanceKm =
+        typeof v.distanceInMeters === 'number'
+            ? parseFloat((v.distanceInMeters / 1000).toFixed(1))
+            : 0;
 
     return {
         id: v._id,
         businessName: v.businessName || 'Tiffin Kitchen',
         ownerName: ownerName,
-        rating: typeof v.averageRating === 'number' && v.averageRating > 0 ? v.averageRating : 4.5,
+        rating:
+            typeof v.averageRating === 'number' && v.averageRating > 0
+                ? v.averageRating
+                : 4.5,
         reviewsCount: typeof v.totalRating === 'number' ? v.totalRating : 12,
         distanceKm: distanceKm,
         isOpen: v.isOpen !== undefined ? v.isOpen : true,
         deliveryRadiusKm: v.deliveryRadiuskm || 5,
         tiers: v.tiers || [],
         addOns: v.addOns || [],
-        description: v.description || 'Homely and hygienic meals delivered straight to your doorstep.',
+        description:
+            v.description ||
+            'Homely and hygienic meals delivered straight to your doorstep.',
     };
 };
 
 export default function CustomerHome({
-    initialCustomerName = 'Kushal',
-    initialWalletBalance = 450,
+    initialCustomerName = '',
+    initialWalletBalance = 0,
 }: CustomerHomeProps) {
     const navigate = useNavigate();
     const storeLogout = useAuthStore((state) => state.logout);
@@ -115,6 +119,7 @@ export default function CustomerHome({
     // ==========================================
     const [customerName, setCustomerName] = useState(initialCustomerName);
     const [walletBalance, setWalletBalance] = useState(initialWalletBalance);
+    const [profileLoading, setProfileLoading] = useState(true);
     const [friendProfiles, setFriendProfiles] = useState<any[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [loading, setLoading] = useState(true);
@@ -188,13 +193,14 @@ export default function CustomerHome({
     // Helper to determine active lunch/dinner session dynamically
     const getCurrentTimeSession = (): 'lunch' | 'dinner' => {
         const hour = new Date().getHours();
-        return hour >= 16 ? 'dinner' : 'lunch';
+        return hour >= 15 ? 'dinner' : 'lunch';
     };
 
     // Load customer profile details
     useEffect(() => {
         const fetchProfile = async () => {
             try {
+                setProfileLoading(true);
                 const res = await api.get('/customer/profile');
                 if (res.data.success && res.data.data) {
                     const profile = res.data.data;
@@ -208,6 +214,8 @@ export default function CustomerHome({
                 }
             } catch (err) {
                 console.error('Error fetching customer profile:', err);
+            } finally {
+                setProfileLoading(false);
             }
         };
         fetchProfile();
@@ -275,9 +283,14 @@ export default function CustomerHome({
                 } catch (err: any) {
                     console.error('Error fetching nearby vendors:', err);
                     if (err.response?.status === 400) {
-                        setLocationError(err.response?.data?.message || 'Please set your location first.');
+                        setLocationError(
+                            err.response?.data?.message ||
+                                'Please set your location first.',
+                        );
                     } else {
-                        setLocationError('Failed to load nearby vendors. Please check connection.');
+                        setLocationError(
+                            'Failed to load nearby vendors. Please check connection.',
+                        );
                     }
                     setVendors([]);
                 } finally {
@@ -292,7 +305,9 @@ export default function CustomerHome({
             try {
                 setLoading(true);
                 setLocationError(null);
-                const res = await api.get(`/customer/vendors/search?q=${encodeURIComponent(searchQuery)}`);
+                const res = await api.get(
+                    `/customer/vendors/search?q=${encodeURIComponent(searchQuery)}`,
+                );
                 if (res.data.success) {
                     const mapped = res.data.data.map(mapBackendVendor);
                     setVendors(mapped);
@@ -322,8 +337,12 @@ export default function CustomerHome({
         // Optional client-side secondary filter if query is active
         if (searchQuery) {
             const matchesQuery =
-                v.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                v.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                v.businessName
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase()) ||
+                v.description
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase()) ||
                 v.ownerName.toLowerCase().includes(searchQuery.toLowerCase());
 
             if (!matchesQuery) return false;
@@ -352,7 +371,9 @@ export default function CustomerHome({
 
         try {
             const session = getCurrentTimeSession();
-            const res = await api.get(`/customer/vendors/${vendor.id}/menu?session=${session}`);
+            const res = await api.get(
+                `/customer/vendors/${vendor.id}/menu?session=${session}`,
+            );
 
             let updatedVendor = { ...vendor };
             if (res.data.success && res.data.data) {
@@ -360,8 +381,14 @@ export default function CustomerHome({
                 updatedVendor = {
                     ...vendor,
                     description: menuData.description || vendor.description,
-                    tiers: menuData.tiers && menuData.tiers.length > 0 ? menuData.tiers : vendor.tiers,
-                    addOns: menuData.addOns && menuData.addOns.length > 0 ? menuData.addOns : vendor.addOns,
+                    tiers:
+                        menuData.tiers && menuData.tiers.length > 0
+                            ? menuData.tiers
+                            : vendor.tiers,
+                    addOns:
+                        menuData.addOns && menuData.addOns.length > 0
+                            ? menuData.addOns
+                            : vendor.addOns,
                 };
                 setSelectedVendor(updatedVendor);
             }
@@ -753,60 +780,75 @@ export default function CustomerHome({
                     1. TOP BAR SECTION (Glassmorphic & Themed)
                    ========================================== */}
                 <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.12)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center space-x-4">
-                        {/* Interactive Avatar / Initials badge */}
-                        <button
-                            onClick={() =>
-                                alert('Profile settings screen placeholder')
-                            }
-                            title="View Customer Profile"
-                            className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
-                        >
-                            <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
-                                {customerName ? getInitials(customerName) : 'K'}
-                            </span>
-                        </button>
-                        <div className="text-center sm:text-left">
-                            <p className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
-                                {greeting}
-                            </p>
-                            <h1 className="font-display text-2xl md:text-3xl font-extrabold text-[#2B2118]">
-                                {customerName}
-                            </h1>
-                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-[#2B2118]/60 mt-1 font-body">
-                                <span>{formattedDate}</span>
+                    {profileLoading ? (
+                        <div className="flex items-center space-x-4 animate-pulse">
+                            <div className="w-14 h-14 rounded-2xl bg-charcoal/10 shrink-0" />
+                            <div className="text-left space-y-2">
+                                <div className="h-2.5 w-16 bg-charcoal/10 rounded" />
+                                <div className="h-6 w-36 bg-charcoal/10 rounded-lg" />
+                                <div className="h-3 w-24 bg-charcoal/10 rounded" />
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex items-center space-x-4">
+                            {/* Interactive Avatar / Initials badge */}
+                            <button
+                                onClick={() =>
+                                    alert('Profile settings screen placeholder')
+                                }
+                                title="View Customer Profile"
+                                className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
+                            >
+                                <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
+                                    {customerName ? getInitials(customerName) : 'C'}
+                                </span>
+                            </button>
+                            <div className="text-center sm:text-left">
+                                <p className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
+                                    {greeting}
+                                </p>
+                                <h1 className="font-display text-2xl md:text-3xl font-extrabold text-[#2B2118]">
+                                    {customerName || 'Customer'}
+                                </h1>
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-[#2B2118]/60 mt-1 font-body">
+                                    <span>{formattedDate}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-4">
                         {/* Wallet Balance Pill */}
-                        <div className="bg-[#5C7A52]/10 border border-[#5C7A52]/20 rounded-2xl px-4 py-2.5 flex items-center gap-2 select-none shadow-sm">
-                            <svg
-                                className="w-4 h-4 text-[#5C7A52]"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2.5}
-                                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                                />
-                            </svg>
-                            <div className="text-left font-body">
-                                <p className="text-[9px] uppercase tracking-wider font-bold text-[#2B2118]/40 leading-none">
-                                    Wallet Balance
-                                </p>
-                                <p className="text-sm font-extrabold text-[#5C7A52] leading-none mt-1">
-                                    ₹{walletBalance.toFixed(2)}
-                                </p>
+                        {profileLoading ? (
+                            <div className="h-[46px] w-[140px] bg-charcoal/10 rounded-2xl animate-pulse" />
+                        ) : (
+                            <div className="bg-[#5C7A52]/10 border border-[#5C7A52]/20 rounded-2xl px-4 py-2.5 flex items-center gap-2 select-none shadow-sm">
+                                <svg
+                                    className="w-4 h-4 text-[#5C7A52]"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2.5}
+                                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                                    />
+                                </svg>
+                                <div className="text-left font-body">
+                                    <p className="text-[9px] uppercase tracking-wider font-bold text-[#2B2118]/40 leading-none">
+                                        Wallet Balance
+                                    </p>
+                                    <p className="text-sm font-extrabold text-[#5C7A52] leading-none mt-1">
+                                        ₹{walletBalance.toFixed(2)}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Notification Bell */}
-                        <div className="relative">
+                        <div className="static sm:relative">
                             <button
                                 onClick={() => {
                                     setShowNotifications(!showNotifications);
@@ -837,7 +879,7 @@ export default function CustomerHome({
 
                             {/* Dropdown panel */}
                             {showNotifications && (
-                                <div className="absolute right-0 mt-3 w-80 bg-white border border-[#2B2118]/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
+                                <div className="absolute right-4 left-4 sm:right-0 sm:left-auto mt-3 sm:w-80 bg-white border border-[#2B2118]/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
                                     <div className="flex justify-between items-center border-b border-[#2B2118]/5 pb-2 mb-2">
                                         <h3 className="font-display font-bold text-sm text-[#2B2118]">
                                             Notifications
@@ -1003,7 +1045,23 @@ export default function CustomerHome({
                             </h2>
                         </div>
 
-                        {simulateEmptyMyVendors ||
+                        {loading ? (
+                            /* Subscribed Vendors Loading Skeleton */
+                            <div className="flex gap-4 overflow-x-auto pb-3 pt-1 animate-pulse">
+                                {[1, 2, 3].map((n) => (
+                                    <div
+                                        key={n}
+                                        className="flex-shrink-0 bg-white/20 border border-white/10 rounded-2xl p-4 flex items-center space-x-3 w-64 h-20 shadow-sm"
+                                    >
+                                        <div className="w-11 h-11 rounded-full bg-charcoal/10 shrink-0" />
+                                        <div className="space-y-2 flex-1">
+                                            <div className="h-3.5 w-24 bg-charcoal/10 rounded" />
+                                            <div className="h-2.5 w-16 bg-charcoal/10 rounded" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : simulateEmptyMyVendors ||
                         SAMPLE_MY_VENDORS.length === 0 ? (
                             /* Subscribed Vendors Empty State */
                             <div className="bg-white/30 backdrop-blur-md border border-[#2B2118]/10 border-dashed rounded-[32px] p-8 text-center flex flex-col items-center justify-center min-h-[180px] shadow-sm transition-all duration-300">
@@ -1090,7 +1148,8 @@ export default function CustomerHome({
                                             if (!match) {
                                                 match = {
                                                     id: mv.id,
-                                                    businessName: mv.businessName,
+                                                    businessName:
+                                                        mv.businessName,
                                                     ownerName: 'Vendor Kitchen',
                                                     rating: mv.rating,
                                                     reviewsCount: 12,
@@ -1141,9 +1200,24 @@ export default function CustomerHome({
                             /* Geolocation / Profile Configuration Alert */
                             <div className="bg-white/30 backdrop-blur-md border border-amber-500/35 border-dashed rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[350px] shadow-sm transition-all duration-300">
                                 <div className="w-20 h-20 mb-6 text-amber-500/50 flex items-center justify-center">
-                                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <svg
+                                        className="w-12 h-12"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                        />
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                        />
                                     </svg>
                                 </div>
                                 <h3 className="font-display text-xl font-bold text-charcoal mb-2">
@@ -1166,7 +1240,10 @@ export default function CustomerHome({
                             /* Premium Loading Skeleton */
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {[1, 2, 3, 4].map((n) => (
-                                    <div key={n} className="border border-white/20 rounded-[32px] p-6 bg-white/25 backdrop-blur-sm shadow-[0_8px_25px_-5px_rgba(43,33,24,0.04)] animate-pulse min-h-[280px] flex flex-col justify-between">
+                                    <div
+                                        key={n}
+                                        className="border border-white/20 rounded-[32px] p-6 bg-white/25 backdrop-blur-sm shadow-[0_8px_25px_-5px_rgba(43,33,24,0.04)] animate-pulse min-h-[280px] flex flex-col justify-between"
+                                    >
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <div className="h-4 w-24 bg-charcoal/10 rounded-lg" />
@@ -1186,7 +1263,8 @@ export default function CustomerHome({
                                     </div>
                                 ))}
                             </div>
-                        ) : simulateEmptyNearby || filteredVendors.length === 0 ? (
+                        ) : simulateEmptyNearby ||
+                          filteredVendors.length === 0 ? (
                             /* Nearby Vendors Empty State */
                             <div className="bg-white/30 backdrop-blur-md border border-[#2B2118]/10 border-dashed rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[350px] shadow-sm transition-all duration-300">
                                 <div className="w-24 h-24 mb-6 text-[#5C7A52]/30 stroke-current">
@@ -1341,14 +1419,21 @@ export default function CustomerHome({
                                                             {vendor.tiers.map(
                                                                 (t, tIdx) => (
                                                                     <span
-                                                                        key={tIdx}
+                                                                        key={
+                                                                            tIdx
+                                                                        }
                                                                         className="px-3 py-1 rounded-xl bg-white/80 border border-[#2B2118]/5 text-charcoal text-xs font-bold flex items-center gap-1 shadow-sm font-body"
                                                                     >
                                                                         <span>
-                                                                            {t.name}
+                                                                            {
+                                                                                t.name
+                                                                            }
                                                                         </span>
                                                                         <span className="text-[#5C7A52] font-extrabold">
-                                                                            ₹{t.price}
+                                                                            ₹
+                                                                            {
+                                                                                t.price
+                                                                            }
                                                                         </span>
                                                                     </span>
                                                                 ),
@@ -1356,7 +1441,8 @@ export default function CustomerHome({
                                                         </div>
                                                     ) : (
                                                         <span className="text-xs text-[#2B2118]/40 italic font-body">
-                                                            No menu uploaded for this session yet.
+                                                            No menu uploaded for
+                                                            this session yet.
                                                         </span>
                                                     )}
                                                 </div>
@@ -1548,29 +1634,127 @@ export default function CustomerHome({
                                     </label>
 
                                     {selectedVendor.tiers.length > 0 ? (
-                                        selectedVendor.tiers.map((tier, idx) => {
-                                            const qty =
-                                                orderQuantities[tier.name] || 0;
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className={`border rounded-2xl p-4 transition-all duration-300 flex justify-between items-center ${
-                                                        qty > 0
-                                                            ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
-                                                            : 'bg-[#FBF4EC]/20 border-charcoal/10'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start space-x-3 flex-1 pr-4">
-                                                        {/* Selection Tick Box */}
-                                                        <div className="pt-0.5">
-                                                            <input
-                                                                type="checkbox"
-                                                                id={`tier-select-${idx}`}
-                                                                checked={qty > 0}
-                                                                onChange={(e) => {
+                                        selectedVendor.tiers.map(
+                                            (tier, idx) => {
+                                                const qty =
+                                                    orderQuantities[
+                                                        tier.name
+                                                    ] || 0;
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className={`border rounded-2xl p-4 transition-all duration-300 flex justify-between items-center ${
+                                                            qty > 0
+                                                                ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
+                                                                : 'bg-[#FBF4EC]/20 border-charcoal/10'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start space-x-3 flex-1 pr-4">
+                                                            {/* Selection Tick Box */}
+                                                            <div className="pt-0.5">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`tier-select-${idx}`}
+                                                                    checked={
+                                                                        qty > 0
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        if (
+                                                                            e
+                                                                                .target
+                                                                                .checked
+                                                                        ) {
+                                                                            setOrderQuantities(
+                                                                                (
+                                                                                    prev,
+                                                                                ) => ({
+                                                                                    ...prev,
+                                                                                    [tier.name]: 1,
+                                                                                }),
+                                                                            );
+                                                                        } else {
+                                                                            setOrderQuantities(
+                                                                                (
+                                                                                    prev,
+                                                                                ) => ({
+                                                                                    ...prev,
+                                                                                    [tier.name]: 0,
+                                                                                }),
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    className="rounded border-[#2B2118]/25 text-[#5C7A52] focus:ring-[#5C7A52]/40 w-4 h-4 cursor-pointer"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1.5 flex-1">
+                                                                <label
+                                                                    htmlFor={`tier-select-${idx}`}
+                                                                    className="flex justify-between items-baseline cursor-pointer select-none"
+                                                                >
+                                                                    <h4 className="font-display text-sm font-extrabold text-charcoal">
+                                                                        {
+                                                                            tier.name
+                                                                        }
+                                                                    </h4>
+                                                                    <span className="text-sm font-display font-extrabold text-[#5C7A52]">
+                                                                        ₹
+                                                                        {
+                                                                            tier.price
+                                                                        }
+                                                                    </span>
+                                                                </label>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {tier.items.map(
+                                                                        (
+                                                                            item,
+                                                                            tagIdx,
+                                                                        ) => (
+                                                                            <span
+                                                                                key={
+                                                                                    tagIdx
+                                                                                }
+                                                                                className="px-2 py-0.5 rounded-lg bg-white border border-[#2B2118]/5 text-[#2B2118]/70 text-[10px] font-semibold font-body shadow-sm"
+                                                                            >
+                                                                                {
+                                                                                    item
+                                                                                }
+                                                                            </span>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Quantity Stepper */}
+                                                        <div
+                                                            className={`flex items-center space-x-2.5 bg-white border border-[#2B2118]/10 rounded-xl p-1 shrink-0 select-none shadow-sm transition-all duration-200 ${qty === 0 ? 'opacity-40' : 'opacity-100'}`}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                disabled={
+                                                                    qty === 0
+                                                                }
+                                                                onClick={() =>
+                                                                    updateQuantity(
+                                                                        tier.name,
+                                                                        -1,
+                                                                    )
+                                                                }
+                                                                className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
+                                                            >
+                                                                -
+                                                            </button>
+                                                            <span className="text-xs font-bold w-4 text-center text-charcoal">
+                                                                {qty}
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
                                                                     if (
-                                                                        e.target
-                                                                            .checked
+                                                                        qty ===
+                                                                        0
                                                                     ) {
                                                                         setOrderQuantities(
                                                                             (
@@ -1581,100 +1765,26 @@ export default function CustomerHome({
                                                                             }),
                                                                         );
                                                                     } else {
-                                                                        setOrderQuantities(
-                                                                            (
-                                                                                prev,
-                                                                            ) => ({
-                                                                                ...prev,
-                                                                                [tier.name]: 0,
-                                                                            }),
+                                                                        updateQuantity(
+                                                                            tier.name,
+                                                                            1,
                                                                         );
                                                                     }
                                                                 }}
-                                                                className="rounded border-[#2B2118]/25 text-[#5C7A52] focus:ring-[#5C7A52]/40 w-4 h-4 cursor-pointer"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5 flex-1">
-                                                            <label
-                                                                htmlFor={`tier-select-${idx}`}
-                                                                className="flex justify-between items-baseline cursor-pointer select-none"
+                                                                className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
                                                             >
-                                                                <h4 className="font-display text-sm font-extrabold text-charcoal">
-                                                                    {tier.name}
-                                                                </h4>
-                                                                <span className="text-sm font-display font-extrabold text-[#5C7A52]">
-                                                                    ₹{tier.price}
-                                                                </span>
-                                                            </label>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {tier.items.map(
-                                                                    (
-                                                                        item,
-                                                                        tagIdx,
-                                                                    ) => (
-                                                                        <span
-                                                                            key={
-                                                                                tagIdx
-                                                                            }
-                                                                            className="px-2 py-0.5 rounded-lg bg-white border border-[#2B2118]/5 text-[#2B2118]/70 text-[10px] font-semibold font-body shadow-sm"
-                                                                        >
-                                                                            {item}
-                                                                        </span>
-                                                                    ),
-                                                                )}
-                                                            </div>
+                                                                +
+                                                            </button>
                                                         </div>
                                                     </div>
-
-                                                    {/* Quantity Stepper */}
-                                                    <div
-                                                        className={`flex items-center space-x-2.5 bg-white border border-[#2B2118]/10 rounded-xl p-1 shrink-0 select-none shadow-sm transition-all duration-200 ${qty === 0 ? 'opacity-40' : 'opacity-100'}`}
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            disabled={qty === 0}
-                                                            onClick={() =>
-                                                                updateQuantity(
-                                                                    tier.name,
-                                                                    -1,
-                                                                )
-                                                            }
-                                                            className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                                                        >
-                                                            -
-                                                        </button>
-                                                        <span className="text-xs font-bold w-4 text-center text-charcoal">
-                                                            {qty}
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (qty === 0) {
-                                                                    setOrderQuantities(
-                                                                        (prev) => ({
-                                                                            ...prev,
-                                                                            [tier.name]: 1,
-                                                                        }),
-                                                                    );
-                                                                } else {
-                                                                    updateQuantity(
-                                                                        tier.name,
-                                                                        1,
-                                                                    );
-                                                                }
-                                                            }}
-                                                            className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                                                        >
-                                                            +
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
+                                                );
+                                            },
+                                        )
                                     ) : (
                                         <div className="p-4 text-center bg-[#FBF4EC]/10 border border-[#2B2118]/5 rounded-2xl">
                                             <p className="text-xs text-[#2B2118]/45 italic font-body">
-                                                No menu tiers uploaded for this session yet.
+                                                No menu tiers uploaded for this
+                                                session yet.
                                             </p>
                                         </div>
                                     )}
@@ -1770,11 +1880,19 @@ export default function CustomerHome({
                                                 <option value="Myself">
                                                     Myself ({customerName})
                                                 </option>
-                                                {friendProfiles.map((friend: any) => (
-                                                    <option key={friend._id || friend.name} value={friend.name}>
-                                                        {friend.name}
-                                                    </option>
-                                                ))}
+                                                {friendProfiles.map(
+                                                    (friend: any) => (
+                                                        <option
+                                                            key={
+                                                                friend._id ||
+                                                                friend.name
+                                                            }
+                                                            value={friend.name}
+                                                        >
+                                                            {friend.name}
+                                                        </option>
+                                                    ),
+                                                )}
                                             </select>
                                         </div>
                                     </div>

@@ -41,4 +41,8 @@ app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     next();
 });
+
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
 export default app;

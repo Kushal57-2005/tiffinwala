@@ -296,6 +296,7 @@ export default function VendorHome({
     // ==========================================
     const [isOpen, setIsOpen] = useState(initialIsOpen);
     const [businessName, setBusinessName] = useState(initialBusinessName);
+    const [profileLoading, setProfileLoading] = useState(true);
     const [selectedSession, setSelectedSession] = useState<'Lunch' | 'Dinner'>(
         () => {
             const hour = new Date().getHours();
@@ -391,6 +392,7 @@ export default function VendorHome({
     useEffect(() => {
         const fetchProfile = async () => {
             try {
+                setProfileLoading(true);
                 const profileRes = await api.get('/vendor/profile');
                 if (profileRes.data.data) {
                     const profile = profileRes.data.data;
@@ -410,6 +412,8 @@ export default function VendorHome({
                 }
             } catch (err) {
                 console.error('Failed to fetch vendor profile', err);
+            } finally {
+                setProfileLoading(false);
             }
         };
         fetchProfile();
@@ -962,37 +966,48 @@ export default function VendorHome({
                     1. TOP BAR SECTION (Glassmorphic & Detailed)
                    ========================================== */}
                 <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.15)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center space-x-4">
-                        {/* Interactive Avatar / Kitchen Badge */}
-                        <button
-                            onClick={() => setShowProfileModal(true)}
-                            title="Edit Profile Settings"
-                            className="w-14 h-14 rounded-2xl bg-spice/10 hover:bg-spice/20 border border-spice/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
-                        >
-                            <span className="text-2xl font-display font-extrabold text-spice select-none">
-                                {businessName ? getInitials(businessName) : 'A'}
-                            </span>
-                        </button>
-                        <div className="text-center sm:text-left">
-                            <p className="text-[10px] text-charcoal/50 font-bold uppercase tracking-wider font-body">
-                                {greeting}
-                            </p>
-                            <h1 className="font-display text-2xl md:text-3xl font-extrabold text-charcoal">
-                                {businessName}
-                            </h1>
-
-                            {/* Today's Date & Dynamic Stats inline line */}
-                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-charcoal/60 mt-1 font-body">
-                                <span>{formattedDate}</span>
-                                <span className="w-1 h-1 rounded-full bg-charcoal/20" />
-                                <span>{orders.length} orders today</span>
-                                <span className="w-1 h-1 rounded-full bg-charcoal/20" />
-                                <span className="text-spice font-bold">
-                                    ₹{totalEarnings} earned
-                                </span>
+                    {profileLoading ? (
+                        <div className="flex items-center space-x-4 animate-pulse">
+                            <div className="w-14 h-14 rounded-2xl bg-charcoal/10 shrink-0" />
+                            <div className="text-left space-y-2">
+                                <div className="h-2.5 w-16 bg-charcoal/10 rounded" />
+                                <div className="h-6 w-40 bg-charcoal/10 rounded-lg" />
+                                <div className="h-3 w-48 bg-charcoal/10 rounded" />
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex items-center space-x-4">
+                            {/* Interactive Avatar / Kitchen Badge */}
+                            <button
+                                onClick={() => setShowProfileModal(true)}
+                                title="Edit Profile Settings"
+                                className="w-14 h-14 rounded-2xl bg-spice/10 hover:bg-spice/20 border border-spice/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
+                            >
+                                <span className="text-2xl font-display font-extrabold text-spice select-none">
+                                    {businessName ? getInitials(businessName) : 'A'}
+                                </span>
+                            </button>
+                            <div className="text-center sm:text-left">
+                                <p className="text-[10px] text-charcoal/50 font-bold uppercase tracking-wider font-body">
+                                    {greeting}
+                                </p>
+                                <h1 className="font-display text-2xl md:text-3xl font-extrabold text-charcoal">
+                                    {businessName}
+                                </h1>
+
+                                {/* Today's Date & Dynamic Stats inline line */}
+                                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-charcoal/60 mt-1 font-body">
+                                    <span>{formattedDate}</span>
+                                    <span className="w-1 h-1 rounded-full bg-charcoal/20" />
+                                    <span>{orders.length} orders today</span>
+                                    <span className="w-1 h-1 rounded-full bg-charcoal/20" />
+                                    <span className="text-spice font-bold">
+                                        ₹{totalEarnings} earned
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-6">
                         {/* Open/Close tactile animated switch with tactile ripple */}
@@ -1035,7 +1050,7 @@ export default function VendorHome({
                         </div>
 
                         {/* Notification Bell */}
-                        <div className="relative">
+                        <div className="static sm:relative">
                             <button
                                 onClick={() => {
                                     setShowNotifications(!showNotifications);
@@ -1066,7 +1081,7 @@ export default function VendorHome({
 
                             {/* Dropdown panel */}
                             {showNotifications && (
-                                <div className="absolute right-0 mt-3 w-80 bg-white border border-charcoal/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
+                                <div className="absolute right-4 left-4 sm:right-0 sm:left-auto mt-3 sm:w-80 bg-white border border-charcoal/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
                                     <div className="flex justify-between items-center border-b border-charcoal/5 pb-2 mb-2">
                                         <h3 className="font-display font-bold text-sm text-charcoal">
                                             Notifications
@@ -1659,7 +1674,23 @@ export default function VendorHome({
                             </div>
                         </div>
 
-                        {filteredOrders.length === 0 ? (
+                        {profileLoading ? (
+                            /* Orders Loading Skeleton */
+                            <div className="space-y-4 animate-pulse">
+                                {[1, 2, 3].map((n) => (
+                                    <div
+                                        key={n}
+                                        className="bg-white/20 border border-white/10 rounded-2xl p-5 flex items-center space-x-4 h-24 shadow-sm"
+                                    >
+                                        <div className="w-11 h-11 rounded-full bg-charcoal/10 shrink-0" />
+                                        <div className="space-y-2 flex-1">
+                                            <div className="h-3.5 w-32 bg-charcoal/10 rounded" />
+                                            <div className="h-2.5 w-48 bg-charcoal/10 rounded" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : filteredOrders.length === 0 ? (
                             /* Orders Empty State */
                             <div className="bg-white/30 backdrop-blur-md border border-charcoal/10 border-dashed rounded-[32px] p-8 text-center flex flex-col items-center justify-center min-h-[360px] shadow-sm">
                                 <div className="w-16 h-16 rounded-full bg-charcoal/5 flex items-center justify-center mb-4 text-charcoal/40 shadow-inner">

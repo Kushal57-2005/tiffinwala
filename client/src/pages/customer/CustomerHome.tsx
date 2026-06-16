@@ -78,25 +78,6 @@ const mapBackendVendor = (v: any): Vendor => {
         ? parseFloat((v.distanceInMeters / 1000).toFixed(1))
         : 0;
 
-    const defaultTiers = [
-        {
-            name: 'Standard Thali',
-            items: ['3 Roti', 'Dal Tadka', 'Jeera Rice', 'Dry Sabzi'],
-            price: 80,
-        },
-        {
-            name: 'Deluxe Thali',
-            items: ['4 Butter Roti', 'Paneer Sabzi', 'Dal Fry', 'Jeera Rice', 'Sweet'],
-            price: 120,
-        }
-    ];
-
-    const defaultAddOns = [
-        { name: 'Spiced Buttermilk', price: 20 },
-        { name: 'Extra Butter Roti', price: 10 },
-        { name: 'Sweet Gulab Jamun (2 pcs)', price: 30 }
-    ];
-
     return {
         id: v._id,
         businessName: v.businessName || 'Tiffin Kitchen',
@@ -106,8 +87,8 @@ const mapBackendVendor = (v: any): Vendor => {
         distanceKm: distanceKm,
         isOpen: v.isOpen !== undefined ? v.isOpen : true,
         deliveryRadiusKm: v.deliveryRadiuskm || 5,
-        tiers: v.tiers || defaultTiers,
-        addOns: v.addOns || defaultAddOns,
+        tiers: v.tiers || [],
+        addOns: v.addOns || [],
         description: v.description || 'Homely and hygienic meals delivered straight to your doorstep.',
     };
 };
@@ -1355,26 +1336,29 @@ export default function CustomerHome({
                                                     <span className="text-[9px] uppercase tracking-widest font-bold text-[#2B2118]/45 block font-body">
                                                         Today's Offerings
                                                     </span>
-                                                    <div className="flex flex-wrap gap-2 select-none">
-                                                        {vendor.tiers.map(
-                                                            (t, tIdx) => (
-                                                                <span
-                                                                    key={tIdx}
-                                                                    className="px-3 py-1 rounded-xl bg-white/80 border border-[#2B2118]/5 text-charcoal text-xs font-bold flex items-center gap-1 shadow-sm font-body"
-                                                                >
-                                                                    <span>
-                                                                        {t.name}
+                                                    {vendor.tiers.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-2 select-none">
+                                                            {vendor.tiers.map(
+                                                                (t, tIdx) => (
+                                                                    <span
+                                                                        key={tIdx}
+                                                                        className="px-3 py-1 rounded-xl bg-white/80 border border-[#2B2118]/5 text-charcoal text-xs font-bold flex items-center gap-1 shadow-sm font-body"
+                                                                    >
+                                                                        <span>
+                                                                            {t.name}
+                                                                        </span>
+                                                                        <span className="text-[#5C7A52] font-extrabold">
+                                                                            ₹{t.price}
+                                                                        </span>
                                                                     </span>
-                                                                    <span className="text-[#5C7A52] font-extrabold">
-                                                                        ₹
-                                                                        {
-                                                                            t.price
-                                                                        }
-                                                                    </span>
-                                                                </span>
-                                                            ),
-                                                        )}
-                                                    </div>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-[#2B2118]/40 italic font-body">
+                                                            No menu uploaded for this session yet.
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -1563,129 +1547,137 @@ export default function CustomerHome({
                                         Today's Tiffin Tiers
                                     </label>
 
-                                    {selectedVendor.tiers.map((tier, idx) => {
-                                        const qty =
-                                            orderQuantities[tier.name] || 0;
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className={`border rounded-2xl p-4 transition-all duration-300 flex justify-between items-center ${
-                                                    qty > 0
-                                                        ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
-                                                        : 'bg-[#FBF4EC]/20 border-charcoal/10'
-                                                }`}
-                                            >
-                                                <div className="flex items-start space-x-3 flex-1 pr-4">
-                                                    {/* Selection Tick Box */}
-                                                    <div className="pt-0.5">
-                                                        <input
-                                                            type="checkbox"
-                                                            id={`tier-select-${idx}`}
-                                                            checked={qty > 0}
-                                                            onChange={(e) => {
-                                                                if (
-                                                                    e.target
-                                                                        .checked
-                                                                ) {
+                                    {selectedVendor.tiers.length > 0 ? (
+                                        selectedVendor.tiers.map((tier, idx) => {
+                                            const qty =
+                                                orderQuantities[tier.name] || 0;
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`border rounded-2xl p-4 transition-all duration-300 flex justify-between items-center ${
+                                                        qty > 0
+                                                            ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
+                                                            : 'bg-[#FBF4EC]/20 border-charcoal/10'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start space-x-3 flex-1 pr-4">
+                                                        {/* Selection Tick Box */}
+                                                        <div className="pt-0.5">
+                                                            <input
+                                                                type="checkbox"
+                                                                id={`tier-select-${idx}`}
+                                                                checked={qty > 0}
+                                                                onChange={(e) => {
+                                                                    if (
+                                                                        e.target
+                                                                            .checked
+                                                                    ) {
+                                                                        setOrderQuantities(
+                                                                            (
+                                                                                prev,
+                                                                            ) => ({
+                                                                                ...prev,
+                                                                                [tier.name]: 1,
+                                                                            }),
+                                                                        );
+                                                                    } else {
+                                                                        setOrderQuantities(
+                                                                            (
+                                                                                prev,
+                                                                            ) => ({
+                                                                                ...prev,
+                                                                                [tier.name]: 0,
+                                                                            }),
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                className="rounded border-[#2B2118]/25 text-[#5C7A52] focus:ring-[#5C7A52]/40 w-4 h-4 cursor-pointer"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1.5 flex-1">
+                                                            <label
+                                                                htmlFor={`tier-select-${idx}`}
+                                                                className="flex justify-between items-baseline cursor-pointer select-none"
+                                                            >
+                                                                <h4 className="font-display text-sm font-extrabold text-charcoal">
+                                                                    {tier.name}
+                                                                </h4>
+                                                                <span className="text-sm font-display font-extrabold text-[#5C7A52]">
+                                                                    ₹{tier.price}
+                                                                </span>
+                                                            </label>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {tier.items.map(
+                                                                    (
+                                                                        item,
+                                                                        tagIdx,
+                                                                    ) => (
+                                                                        <span
+                                                                            key={
+                                                                                tagIdx
+                                                                            }
+                                                                            className="px-2 py-0.5 rounded-lg bg-white border border-[#2B2118]/5 text-[#2B2118]/70 text-[10px] font-semibold font-body shadow-sm"
+                                                                        >
+                                                                            {item}
+                                                                        </span>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Quantity Stepper */}
+                                                    <div
+                                                        className={`flex items-center space-x-2.5 bg-white border border-[#2B2118]/10 rounded-xl p-1 shrink-0 select-none shadow-sm transition-all duration-200 ${qty === 0 ? 'opacity-40' : 'opacity-100'}`}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            disabled={qty === 0}
+                                                            onClick={() =>
+                                                                updateQuantity(
+                                                                    tier.name,
+                                                                    -1,
+                                                                )
+                                                            }
+                                                            className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <span className="text-xs font-bold w-4 text-center text-charcoal">
+                                                            {qty}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (qty === 0) {
                                                                     setOrderQuantities(
-                                                                        (
-                                                                            prev,
-                                                                        ) => ({
+                                                                        (prev) => ({
                                                                             ...prev,
                                                                             [tier.name]: 1,
                                                                         }),
                                                                     );
                                                                 } else {
-                                                                    setOrderQuantities(
-                                                                        (
-                                                                            prev,
-                                                                        ) => ({
-                                                                            ...prev,
-                                                                            [tier.name]: 0,
-                                                                        }),
+                                                                    updateQuantity(
+                                                                        tier.name,
+                                                                        1,
                                                                     );
                                                                 }
                                                             }}
-                                                            className="rounded border-[#2B2118]/25 text-[#5C7A52] focus:ring-[#5C7A52]/40 w-4 h-4 cursor-pointer"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1.5 flex-1">
-                                                        <label
-                                                            htmlFor={`tier-select-${idx}`}
-                                                            className="flex justify-between items-baseline cursor-pointer select-none"
+                                                            className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
                                                         >
-                                                            <h4 className="font-display text-sm font-extrabold text-charcoal">
-                                                                {tier.name}
-                                                            </h4>
-                                                            <span className="text-sm font-display font-extrabold text-[#5C7A52]">
-                                                                ₹{tier.price}
-                                                            </span>
-                                                        </label>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {tier.items.map(
-                                                                (
-                                                                    item,
-                                                                    tagIdx,
-                                                                ) => (
-                                                                    <span
-                                                                        key={
-                                                                            tagIdx
-                                                                        }
-                                                                        className="px-2 py-0.5 rounded-lg bg-white border border-[#2B2118]/5 text-[#2B2118]/70 text-[10px] font-semibold font-body shadow-sm"
-                                                                    >
-                                                                        {item}
-                                                                    </span>
-                                                                ),
-                                                            )}
-                                                        </div>
+                                                            +
+                                                        </button>
                                                     </div>
                                                 </div>
-
-                                                {/* Quantity Stepper */}
-                                                <div
-                                                    className={`flex items-center space-x-2.5 bg-white border border-[#2B2118]/10 rounded-xl p-1 shrink-0 select-none shadow-sm transition-all duration-200 ${qty === 0 ? 'opacity-40' : 'opacity-100'}`}
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        disabled={qty === 0}
-                                                        onClick={() =>
-                                                            updateQuantity(
-                                                                tier.name,
-                                                                -1,
-                                                            )
-                                                        }
-                                                        className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <span className="text-xs font-bold w-4 text-center text-charcoal">
-                                                        {qty}
-                                                    </span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (qty === 0) {
-                                                                setOrderQuantities(
-                                                                    (prev) => ({
-                                                                        ...prev,
-                                                                        [tier.name]: 1,
-                                                                    }),
-                                                                );
-                                                            } else {
-                                                                updateQuantity(
-                                                                    tier.name,
-                                                                    1,
-                                                                );
-                                                            }
-                                                        }}
-                                                        className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="p-4 text-center bg-[#FBF4EC]/10 border border-[#2B2118]/5 rounded-2xl">
+                                            <p className="text-xs text-[#2B2118]/45 italic font-body">
+                                                No menu tiers uploaded for this session yet.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Add-ons Section */}

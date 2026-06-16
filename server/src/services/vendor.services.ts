@@ -2,6 +2,7 @@ import { IAddOn, ITier, MenuItem } from '../models/MenuItem.model';
 import { User } from '../models/User.model';
 import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
+import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
 
 export const toggleVendorOpenService = async (userId: string) => {
@@ -48,8 +49,7 @@ export const createMenuService = async (
         throw new ApiError(400, 'session must be "lunch" or "dinner"');
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getTodayUTC();
 
     const existing = await MenuItem.findOne({
         vendorId: vendor._id,
@@ -106,8 +106,7 @@ export const getTodayMenuService = async (
     vendorId: string,
     session: 'lunch' | 'dinner',
 ) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getTodayUTC();
 
     return await MenuItem.findOne({
         vendorId,

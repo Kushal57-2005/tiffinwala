@@ -62,7 +62,10 @@ export const getVendorMenuForCustomer = asyncHandler(
         const session =
             (req.query.session as string) === 'dinner' ? 'dinner' : 'lunch';
 
-        const result = await getTodayMenuService(vendorId as string, session as 'lunch' | 'dinner');
+        const result = await getTodayMenuService(
+            vendorId as string,
+            session as 'lunch' | 'dinner',
+        );
 
         return res
             .status(200)
@@ -77,4 +80,3 @@ export const getVendorMenuForCustomer = asyncHandler(
             );
     },
 );
-

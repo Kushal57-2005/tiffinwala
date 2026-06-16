@@ -1,6 +1,8 @@
 import { Customer } from '../models/Customer.model';
 import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
+import { getTodayUTC } from '../utils/getTodayUTC';
+import { getCurrentSession } from '../utils/session';
 
 export const getNearbyVendorService = async (userId: string) => {
     const customer = await Customer.findOne({ userId });
@@ -13,6 +15,9 @@ export const getNearbyVendorService = async (userId: string) => {
     if (lng === 0 && lat === 0) {
         throw new ApiError(400, 'Please set your location first');
     }
+
+    const today = getTodayUTC();
+    const session = getCurrentSession();
 
     const vendors = await Vendor.aggregate([
         {
@@ -33,6 +38,47 @@ export const getNearbyVendorService = async (userId: string) => {
         {
             $unwind: '$userInfo',
         },
+        // Join today's menu for the current session
+        {
+            $lookup: {
+                from: 'menuitems',
+                let: { vendorId: '$_id' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: { $eq: ['$vendorId', '$$vendorId'] },
+                            session,
+                            date: today,
+                            isExpired: false,
+                        },
+                    },
+                    { $limit: 1 },
+                ],
+                as: 'todayMenu',
+            },
+        },
+        {
+            $addFields: {
+                tiers: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$todayMenu.tiers', 0] },
+                        [],
+                    ],
+                },
+                addOns: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$todayMenu.addOns', 0] },
+                        [],
+                    ],
+                },
+                description: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$todayMenu.description', 0] },
+                        '',
+                    ],
+                },
+            },
+        },
         {
             $project: {
                 businessName: 1,
@@ -45,6 +91,9 @@ export const getNearbyVendorService = async (userId: string) => {
                 'userInfo.firstName': 1,
                 'userInfo.lastName': 1,
                 'userInfo.phone': 1,
+                tiers: 1,
+                addOns: 1,
+                description: 1,
             },
         },
     ]);
@@ -110,4 +159,11 @@ export const searchVendorsService = async (query: string) => {
     }).populate('userId', 'firstName lastName phone');
 
     return vendors;
+};
+
+export const getCustomerProfileService = async (userId: string) => {
+    const customer = await Customer.findOne({ userId });
+    if (!customer) {
+        throw new ApiError(404, 'Customer not found');
+    }
 };

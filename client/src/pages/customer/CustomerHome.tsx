@@ -76,6 +76,7 @@ const mapBackendVendor = (v: any): Vendor => {
         typeof v.distanceInMeters === 'number'
             ? parseFloat((v.distanceInMeters / 1000).toFixed(1))
             : 0;
+    console.log('RAW VENDOR:', v);
 
     return {
         id: v._id,
@@ -800,7 +801,9 @@ export default function CustomerHome({
                                 className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
                             >
                                 <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
-                                    {customerName ? getInitials(customerName) : 'C'}
+                                    {customerName
+                                        ? getInitials(customerName)
+                                        : 'C'}
                                 </span>
                             </button>
                             <div className="text-center sm:text-left">
@@ -1062,7 +1065,7 @@ export default function CustomerHome({
                                 ))}
                             </div>
                         ) : simulateEmptyMyVendors ||
-                        SAMPLE_MY_VENDORS.length === 0 ? (
+                          SAMPLE_MY_VENDORS.length === 0 ? (
                             /* Subscribed Vendors Empty State */
                             <div className="bg-white/30 backdrop-blur-md border border-[#2B2118]/10 border-dashed rounded-[32px] p-8 text-center flex flex-col items-center justify-center min-h-[180px] shadow-sm transition-all duration-300">
                                 {/* Leaf themed Tiffin box SVG */}
@@ -1440,9 +1443,9 @@ export default function CustomerHome({
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <span className="text-xs text-[#2B2118]/40 italic font-body">
-                                                            No menu uploaded for
-                                                            this session yet.
+                                                        <span className="text-xs text-[#2B2118]/40 italic">
+                                                            Tap to view today's
+                                                            menu
                                                         </span>
                                                     )}
                                                 </div>

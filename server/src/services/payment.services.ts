@@ -67,3 +67,4 @@ export const verifyVendorPaymentService = async (
 
     return { message: 'Payment successful, account activated' };
 };
+

@@ -60,16 +60,10 @@ export const getNearbyVendorService = async (userId: string) => {
         {
             $addFields: {
                 tiers: {
-                    $ifNull: [
-                        { $arrayElemAt: ['$todayMenu.tiers', 0] },
-                        [],
-                    ],
+                    $ifNull: [{ $arrayElemAt: ['$todayMenu.tiers', 0] }, []],
                 },
                 addOns: {
-                    $ifNull: [
-                        { $arrayElemAt: ['$todayMenu.addOns', 0] },
-                        [],
-                    ],
+                    $ifNull: [{ $arrayElemAt: ['$todayMenu.addOns', 0] }, []],
                 },
                 description: {
                     $ifNull: [
@@ -162,8 +156,66 @@ export const searchVendorsService = async (query: string) => {
 };
 
 export const getCustomerProfileService = async (userId: string) => {
-    const customer = await Customer.findOne({ userId });
+    const customer = await Customer.findOne({ userId }).populate(
+        'userId',
+        'firstName lastName email phone',
+    );
     if (!customer) {
         throw new ApiError(404, 'Customer not found');
     }
+
+    return customer;
+};
+
+export const updateCustomerProfileService = async (
+    userId: string,
+    firstname?: string,
+    lastname?: string,
+    email?: string,
+    phone?: string,
+    address?: string,
+    coordinates?: [number, number],
+) => {
+    // Build User update payload
+    const userUpdateData: Record<string, any> = {};
+    if (firstname) userUpdateData.firstName = firstname;
+    if (lastname) userUpdateData.lastName = lastname;
+    if (email) userUpdateData.email = email;
+    if (phone) userUpdateData.phone = phone;
+
+    if (Object.keys(userUpdateData).length > 0) {
+        const updatedUser = await (
+            await import('../models/User.model')
+        ).User.findByIdAndUpdate(
+            userId,
+            { $set: userUpdateData },
+            { new: true, runValidators: true },
+        );
+        if (!updatedUser) throw new ApiError(404, 'User not found');
+    }
+
+    // Build Customer update payload
+    const customerUpdateData: Record<string, any> = {};
+    if (address && address.trim()) {
+        customerUpdateData['location.address'] = address.trim();
+    }
+    if (
+        Array.isArray(coordinates) &&
+        coordinates.length === 2 &&
+        !(coordinates[0] === 0 && coordinates[1] === 0)
+    ) {
+        customerUpdateData['location.type'] = 'Point';
+        // coordinates expected as [lng, lat] (GeoJSON order)
+        customerUpdateData['location.coordinates'] = coordinates;
+    }
+
+    const customer = await Customer.findOneAndUpdate(
+        { userId },
+        { $set: customerUpdateData },
+        { new: true, runValidators: true },
+    ).populate('userId', 'firstName lastName email phone');
+
+    if (!customer) throw new ApiError(404, 'Customer not found');
+
+    return customer;
 };

@@ -1,6 +1,8 @@
 import {
+    getCustomerProfileService,
     getNearbyVendorService,
     updateCustomerLocationService,
+    updateCustomerProfileService,
 } from '../services/customer.services';
 import { getTodayMenuService } from '../services/vendor.services';
 import { Customer } from '../models/Customer.model';
@@ -25,16 +27,32 @@ export const getNearbyVendors = asyncHandler(
 export const getCustomerProfile = asyncHandler(
     async (req: AuthRequest, res: Response) => {
         const userId = req.user?.userId as string;
-        const customer = await Customer.findOne({ userId }).populate(
-            'userId',
-            'firstName lastName email phone',
-        );
-        if (!customer) {
-            throw new ApiError(404, 'Customer not found');
-        }
+        const result = await getCustomerProfileService(userId);
         return res
             .status(200)
-            .json(new ApiResponse(200, customer, 'Customer profile fetched'));
+            .json(new ApiResponse(200, result, 'Customer profile fetched'));
+    },
+);
+
+export const updateCustomerProfile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+        const { firstname, lastname, email, phone, address, coordinates } =
+            req.body;
+
+        const result = await updateCustomerProfileService(
+            userId,
+            firstname,
+            lastname,
+            email,
+            phone,
+            address,
+            coordinates,
+        );
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Customer profile updated'));
     },
 );
 
@@ -78,5 +96,17 @@ export const getVendorMenuForCustomer = asyncHandler(
                         : 'No menu uploaded for today',
                 ),
             );
+    },
+);
+
+export const getVendorProfile = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const userId = req.user?.userId as string;
+
+        const result = await getCustomerProfileService(userId);
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Customers profile fetched'));
     },
 );

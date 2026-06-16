@@ -5,18 +5,18 @@ import {
     getNearbyVendors,
     getCustomerProfile,
     updateCustomerLocation,
+    updateCustomerProfile,
     getVendorMenuForCustomer,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
 
 const router = Router();
 
-router.get(
-    '/profile',
-    authMiddleware,
-    requireRole('customer'),
-    getCustomerProfile,
-);
+router
+    .route('/profile')
+    .get(authMiddleware, requireRole('customer'), getCustomerProfile)
+    .put(authMiddleware, requireRole('customer'), updateCustomerProfile);
+
 router.patch(
     '/profile/location',
     authMiddleware,

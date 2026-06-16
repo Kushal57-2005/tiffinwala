@@ -98,6 +98,146 @@ const mapBackendVendor = (v: any): Vendor => {
     };
 };
 
+// ==========================================
+// INTERACTIVE MAP PICKER COMPONENT (LEAFLET)
+// ==========================================
+
+interface MapPickerProps {
+    lat: number;
+    lng: number;
+    onChange: (lat: number, lng: number) => void;
+    address?: string;
+}
+
+function MapPicker({ lat, lng, onChange, address }: MapPickerProps) {
+    const mapRef = React.useRef<HTMLDivElement>(null);
+    const mapInstance = React.useRef<any>(null);
+    const markerInstance = React.useRef<any>(null);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [geocoding, setGeocoding] = useState(false);
+
+    useEffect(() => {
+        if ((window as any).L) { setIsLoaded(true); return; }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+        link.crossOrigin = '';
+        document.head.appendChild(link);
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+        script.crossOrigin = '';
+        script.onload = () => setIsLoaded(true);
+        document.body.appendChild(script);
+    }, []);
+
+    useEffect(() => {
+        if (!isLoaded || !mapRef.current) return;
+        const L = (window as any).L;
+        if (!L) return;
+        const initialLat = lat || 19.076;
+        const initialLng = lng || 72.8777;
+        if (mapInstance.current) {
+            mapInstance.current.remove();
+            mapInstance.current = null;
+            markerInstance.current = null;
+        }
+        const map = L.map(mapRef.current, { zoomControl: true }).setView([initialLat, initialLng], 13);
+        mapInstance.current = map;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map);
+        const customIcon = L.divIcon({
+            className: 'custom-leaflet-marker',
+            html: `<div style="position:relative;width:32px;height:32px;display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;width:14px;height:14px;background:rgba(92,122,82,0.35);border-radius:50%;animation:ripple-ring 1.5s infinite ease-out;top:9px;left:9px"></div>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0px 3px 4px rgba(0,0,0,0.25));position:relative;z-index:10">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#5C7A52"/>
+                </svg>
+            </div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+        });
+        const marker = L.marker([initialLat, initialLng], { draggable: true, icon: customIcon }).addTo(map);
+        markerInstance.current = marker;
+        marker.on('dragend', () => {
+            const pos = marker.getLatLng();
+            onChange(pos.lat, pos.lng);
+        });
+        map.on('click', (e: any) => {
+            marker.setLatLng(e.latlng);
+            onChange(e.latlng.lat, e.latlng.lng);
+        });
+        setTimeout(() => map.invalidateSize(), 350);
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+                markerInstance.current = null;
+            }
+        };
+    }, [isLoaded]);
+
+    useEffect(() => {
+        if (mapInstance.current && markerInstance.current) {
+            const cur = markerInstance.current.getLatLng();
+            const tLat = lat || 19.076;
+            const tLng = lng || 72.8777;
+            if (Math.abs(cur.lat - tLat) > 0.0001 || Math.abs(cur.lng - tLng) > 0.0001) {
+                markerInstance.current.setLatLng([tLat, tLng]);
+                mapInstance.current.setView([tLat, tLng], mapInstance.current.getZoom());
+            }
+        }
+    }, [lat, lng]);
+
+    const locateAddress = async () => {
+        if (!address || !address.trim()) return;
+        setGeocoding(true);
+        try {
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+            );
+            const data = await res.json();
+            if (data && data.length > 0) {
+                onChange(Number(data[0].lat), Number(data[0].lon));
+            } else {
+                alert('Could not locate address. Please position pin manually.');
+            }
+        } catch (err) {
+            console.error('Geocoding error:', err);
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    return (
+        <div className="space-y-2 select-none">
+            <div className="flex justify-between items-center">
+                <span className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
+                    Delivery Location Pin
+                </span>
+                {address && address.trim().length > 3 && (
+                    <button
+                        type="button"
+                        onClick={locateAddress}
+                        disabled={geocoding}
+                        className="text-[10px] text-[#5C7A52] hover:underline font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                        {geocoding ? 'Locating...' : 'Locate Address on Map'}
+                    </button>
+                )}
+            </div>
+            <div ref={mapRef} className="w-full h-48 rounded-2xl border border-[#2B2118]/15 overflow-hidden shadow-inner bg-[#2B2118]/5 z-0" />
+            <div className="flex justify-between text-[10px] text-[#2B2118]/50 font-semibold font-body px-1">
+                <span>Lat: {lat ? lat.toFixed(6) : '0.000000'}</span>
+                <span>Lng: {lng ? lng.toFixed(6) : '0.000000'}</span>
+                <span className="text-[#5C7A52] font-bold">Drag pin or click map</span>
+            </div>
+        </div>
+    );
+}
+
 export default function CustomerHome({
     initialCustomerName = '',
     initialWalletBalance = 0,
@@ -159,6 +299,21 @@ export default function CustomerHome({
     const [notificationCount, setNotificationCount] = useState(2);
     const [showNotifications, setShowNotifications] = useState(false);
 
+    // Profile modal states
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [profileSubmitting, setProfileSubmitting] = useState(false);
+    const [profileError, setProfileError] = useState('');
+    const [focusedField, setFocusedField] = useState<string | null>(null);
+
+    // Profile form fields
+    const [formFirstname, setFormFirstname] = useState('');
+    const [formLastname, setFormLastname] = useState('');
+    const [formEmail, setFormEmail] = useState('');
+    const [formPhone, setFormPhone] = useState('');
+    const [formAddress, setFormAddress] = useState('');
+    const [formLat, setFormLat] = useState<number | ''>('');
+    const [formLng, setFormLng] = useState<number | ''>('');
+
     // Track cursor movement for parallax
     const handleMouseMove = (e: React.MouseEvent) => {
         const { clientX, clientY } = e;
@@ -212,6 +367,14 @@ export default function CustomerHome({
                     setWalletBalance(profile.walletBalance || 0);
                     setFriendProfiles(profile.friendProfiles || []);
                     setCustomerAddress(profile.location?.address || '');
+                    // Pre-populate profile form
+                    setFormFirstname(profile.userId?.firstName || '');
+                    setFormLastname(profile.userId?.lastName || '');
+                    setFormEmail(profile.userId?.email || '');
+                    setFormPhone(profile.userId?.phone || '');
+                    setFormAddress(profile.location?.address || '');
+                    setFormLat(profile.location?.coordinates?.[1] ?? '');
+                    setFormLng(profile.location?.coordinates?.[0] ?? '');
                 }
             } catch (err) {
                 console.error('Error fetching customer profile:', err);
@@ -477,6 +640,7 @@ export default function CustomerHome({
     };
 
     return (
+        <>
         <div
             onMouseMove={handleMouseMove}
             className="min-h-screen bg-[#FBF4EC] font-body text-[#2B2118] pb-24 transition-all duration-300 relative overflow-hidden select-text"
@@ -794,10 +958,8 @@ export default function CustomerHome({
                         <div className="flex items-center space-x-4">
                             {/* Interactive Avatar / Initials badge */}
                             <button
-                                onClick={() =>
-                                    alert('Profile settings screen placeholder')
-                                }
-                                title="View Customer Profile"
+                                onClick={() => setShowProfileModal(true)}
+                                title="Edit Profile Settings"
                                 className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
                             >
                                 <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
@@ -2011,5 +2173,240 @@ export default function CustomerHome({
                 </div>
             )}
         </div>
+
+            {showProfileModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2B2118]/60 backdrop-blur-md transition-opacity duration-300"
+                    onClick={() => setShowProfileModal(false)}
+                >
+                    <div
+                        className="bg-white/95 border border-white/30 shadow-[0_24px_70px_rgba(43,33,24,0.3)] rounded-[32px] w-full max-w-lg overflow-hidden transform transition-all duration-300 flex flex-col animate-scale-up"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Dark Header */}
+                        <div className="bg-gradient-to-br from-[#1F1710] to-[#2E2218] p-6 text-[#FBF4EC] relative select-none">
+                            <img
+                                src={tiffinBg}
+                                alt=""
+                                className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-luminosity pointer-events-none"
+                            />
+                            <div className="relative z-10">
+                                <h3 className="font-display text-xl md:text-2xl font-bold">
+                                    Profile Settings
+                                </h3>
+                                <p className="text-xs text-[#FBF4EC]/60 mt-1">
+                                    Update your personal information and delivery address.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowProfileModal(false)}
+                                className="absolute right-5 top-5 text-[#FBF4EC]/70 hover:text-white transition-colors z-20"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Form Body */}
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (!formFirstname.trim() || !formLastname.trim()) {
+                                    setProfileError('First and Last names are required.');
+                                    return;
+                                }
+                                if (!formEmail.trim() || !formPhone.trim()) {
+                                    setProfileError('Email and Phone are required.');
+                                    return;
+                                }
+                                setProfileSubmitting(true);
+                                setProfileError('');
+                                try {
+                                    const payload: any = {
+                                        firstname: formFirstname,
+                                        lastname: formLastname,
+                                        email: formEmail,
+                                        phone: formPhone,
+                                        address: formAddress,
+                                    };
+                                    if (formLng !== '' && formLat !== '') {
+                                        payload.coordinates = [
+                                            Number(formLng),
+                                            Number(formLat),
+                                        ];
+                                    }
+                                    const res = await api.put('/customer/profile', payload);
+                                    const updated = res.data.data;
+                                    const fullName = updated.userId
+                                        ? `${updated.userId.firstName} ${updated.userId.lastName}`
+                                        : customerName;
+                                    setCustomerName(fullName);
+                                    setCustomerAddress(updated.location?.address || formAddress);
+                                    setFormFirstname(updated.userId?.firstName || '');
+                                    setFormLastname(updated.userId?.lastName || '');
+                                    setFormEmail(updated.userId?.email || '');
+                                    setFormPhone(updated.userId?.phone || '');
+                                    setFormAddress(updated.location?.address || '');
+                                    setFormLat(updated.location?.coordinates?.[1] ?? '');
+                                    setFormLng(updated.location?.coordinates?.[0] ?? '');
+                                    setShowProfileModal(false);
+                                } catch (err: any) {
+                                    setProfileError(
+                                        err.response?.data?.message || 'Failed to update profile. Please try again.',
+                                    );
+                                } finally {
+                                    setProfileSubmitting(false);
+                                }
+                            }}
+                            className="p-6 space-y-4 overflow-y-auto max-h-[72vh] bg-[#FBF4EC]/10 custom-scrollbar"
+                        >
+                            {/* Error banner */}
+                            {profileError && (
+                                <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 text-xs flex items-start space-x-2 font-semibold">
+                                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <span>{profileError}</span>
+                                </div>
+                            )}
+
+                            {/* Personal Details */}
+                            <div className="space-y-3">
+                                <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
+                                    Personal Details
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* First Name */}
+                                    <div className="relative w-full group">
+                                        <input
+                                            type="text"
+                                            value={formFirstname}
+                                            onChange={(e) => setFormFirstname(e.target.value)}
+                                            onFocus={() => setFocusedField('p-firstname')}
+                                            onBlur={() => setFocusedField(null)}
+                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                            placeholder="First Name"
+                                        />
+                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
+                                            focusedField === 'p-firstname' || formFirstname !== ''
+                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
+                                                : 'top-4 text-sm text-[#2B2118]/60'
+                                        }`}>First Name</label>
+                                    </div>
+                                    {/* Last Name */}
+                                    <div className="relative w-full group">
+                                        <input
+                                            type="text"
+                                            value={formLastname}
+                                            onChange={(e) => setFormLastname(e.target.value)}
+                                            onFocus={() => setFocusedField('p-lastname')}
+                                            onBlur={() => setFocusedField(null)}
+                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                            placeholder="Last Name"
+                                        />
+                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
+                                            focusedField === 'p-lastname' || formLastname !== ''
+                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
+                                                : 'top-4 text-sm text-[#2B2118]/60'
+                                        }`}>Last Name</label>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {/* Email */}
+                                    <div className="relative w-full group">
+                                        <input
+                                            type="email"
+                                            value={formEmail}
+                                            onChange={(e) => setFormEmail(e.target.value)}
+                                            onFocus={() => setFocusedField('p-email')}
+                                            onBlur={() => setFocusedField(null)}
+                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                            placeholder="Email Address"
+                                        />
+                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
+                                            focusedField === 'p-email' || formEmail !== ''
+                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
+                                                : 'top-4 text-sm text-[#2B2118]/60'
+                                        }`}>Email Address</label>
+                                    </div>
+                                    {/* Phone */}
+                                    <div className="relative w-full group">
+                                        <input
+                                            type="text"
+                                            value={formPhone}
+                                            onChange={(e) => setFormPhone(e.target.value)}
+                                            onFocus={() => setFocusedField('p-phone')}
+                                            onBlur={() => setFocusedField(null)}
+                                            className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                            placeholder="Phone Number"
+                                        />
+                                        <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
+                                            focusedField === 'p-phone' || formPhone !== ''
+                                                ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
+                                                : 'top-4 text-sm text-[#2B2118]/60'
+                                        }`}>Phone Number</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Delivery Address */}
+                            <div className="space-y-3 pt-2">
+                                <h4 className="text-[10px] text-[#5C7A52] font-bold uppercase tracking-wider block font-body border-b border-[#2B2118]/5 pb-1">
+                                    Delivery Address
+                                </h4>
+                                <div className="relative w-full group">
+                                    <input
+                                        type="text"
+                                        value={formAddress}
+                                        onChange={(e) => setFormAddress(e.target.value)}
+                                        onFocus={() => setFocusedField('p-address')}
+                                        onBlur={() => setFocusedField(null)}
+                                        className="w-full bg-[#FBF4EC]/70 border border-[#2B2118]/15 text-[#2B2118] rounded-2xl px-5 pt-6 pb-2 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body select-text placeholder-transparent"
+                                        placeholder="Delivery Address"
+                                    />
+                                    <label className={`absolute left-5 transition-all duration-300 pointer-events-none font-body ${
+                                        focusedField === 'p-address' || formAddress !== ''
+                                            ? 'top-2 text-[10px] font-bold uppercase tracking-wider text-[#5C7A52]'
+                                            : 'top-4 text-sm text-[#2B2118]/60'
+                                    }`}>Delivery Address</label>
+                                </div>
+
+                                <MapPicker
+                                    lat={formLat === '' ? 0 : Number(formLat)}
+                                    lng={formLng === '' ? 0 : Number(formLng)}
+                                    onChange={(lat, lng) => {
+                                        setFormLat(lat);
+                                        setFormLng(lng);
+                                    }}
+                                    address={formAddress}
+                                />
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowProfileModal(false)}
+                                    className="flex-1 py-3.5 rounded-2xl border border-[#2B2118]/15 text-[#2B2118]/70 hover:text-[#2B2118] hover:bg-[#2B2118]/5 font-bold text-sm transition-all select-none"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={profileSubmitting}
+                                    className="flex-1 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] transition-all flex items-center justify-center space-x-2 select-none disabled:opacity-50"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span>{profileSubmitting ? 'Saving...' : 'Save Settings'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

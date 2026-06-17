@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { IAddOn, ITier, MenuItem } from '../models/MenuItem.model';
 import { User } from '../models/User.model';
 import { Vendor } from '../models/Vendor.model';
@@ -190,3 +191,4 @@ export const updateVendorProfileService = async (
 
     return updatedVendor;
 };
+

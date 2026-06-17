@@ -12,7 +12,7 @@ export interface IVendor extends Document {
     isOpen: boolean;
     walletBalance: number;
     averageRating: number;
-    totalRating: number;
+    totalRatings: number;
     isPaymentDone: boolean;
 }
 
@@ -38,7 +38,7 @@ const VendorSchema = new Schema<IVendor>(
         isOpen: { type: Boolean, default: false },
         walletBalance: { type: Number, default: 0 },
         averageRating: { type: Number, default: 0 },
-        totalRating: { type: Number, default: 0 },
+        totalRatings: { type: Number, default: 0 },
         isPaymentDone: { type: Boolean, default: false },
     },
     { timestamps: true },
@@ -47,4 +47,3 @@ const VendorSchema = new Schema<IVendor>(
 VendorSchema.index({ location: '2dsphere' });
 
 export const Vendor = mongoose.model<IVendor>('Vendor', VendorSchema);
-

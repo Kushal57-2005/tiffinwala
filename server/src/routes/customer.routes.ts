@@ -11,6 +11,7 @@ import {
     addFriendProfile,
     editFriendProfile,
     removeFriendProfile,
+    getVendorPublicDetails,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
 
@@ -69,6 +70,13 @@ router.delete(
     authMiddleware,
     requireRole('customer'),
     removeFriendProfile,
+);
+
+router.get(
+    '/vendors/:vendorId',
+    authMiddleware,
+    requireRole('customer'),
+    getVendorPublicDetails,
 );
 
 export default router;

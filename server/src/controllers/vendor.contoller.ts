@@ -152,3 +152,4 @@ export const searchVendors = asyncHandler(
             .json(new ApiResponse(200, result, 'Search results fetched'));
     },
 );
+

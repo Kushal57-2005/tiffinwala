@@ -4,6 +4,7 @@ import {
     getCustomerProfileService,
     getFriendProfilesService,
     getNearbyVendorService,
+    getVendorPublicDetailsService,
     removeFriendProfileService,
     updateCustomerLocationService,
     updateCustomerProfileService,
@@ -173,5 +174,17 @@ export const removeFriendProfile = asyncHandler(
         return res
             .status(200)
             .json(new ApiResponse(200, result, 'Friend profile removed'));
+    },
+);
+
+export const getVendorPublicDetails = asyncHandler(
+    async (req: AuthRequest, res: Response) => {
+        const vendorId = req.params.vendorId as string;
+
+        const result = await getVendorPublicDetailsService(vendorId);
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, result, 'Vendor Details Fetched'));
     },
 );

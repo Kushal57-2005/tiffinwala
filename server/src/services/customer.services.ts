@@ -1,4 +1,6 @@
+import mongoose from 'mongoose';
 import { Customer } from '../models/Customer.model';
+import { MenuItem } from '../models/MenuItem.model';
 import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
 import { getTodayUTC } from '../utils/getTodayUTC';
@@ -268,7 +270,7 @@ export const removeFriendProfileService = async (
 
     friend.deleteOne();
     await customer.save();
-    
+
     return customer.friendProfiles;
 };
 
@@ -277,4 +279,51 @@ export const getFriendProfilesService = async (userId: string) => {
     if (!customer) throw new ApiError(404, 'Customer not found');
 
     return customer.friendProfiles;
+};
+
+export const getVendorPublicDetailsService = async (vendorId: string) => {
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+        throw new ApiError(400, 'Invalid vendor ID');
+    }
+
+    const vendor = await Vendor.findById(vendorId).populate(
+        'userId',
+        'firstName lastName phone',
+    );
+
+    if (!vendor) {
+        throw new ApiError(404, 'Vendor not found');
+    }
+
+    const today = getTodayUTC();
+    const session = getCurrentSession();
+
+    const todayMenu = await MenuItem.findOne({
+        vendorId: vendor._id,
+        date: today,
+        session,
+        isExpired: false,
+    });
+
+    const owner = vendor.userId as unknown as {
+        firstName: string;
+        lastName: string;
+        phone: string;
+    };
+
+    return {
+        _id: vendor._id,
+        businessName: vendor.businessName,
+        isOpen: vendor.isOpen,
+        averageRating: vendor.averageRating,
+        totalRatings: vendor.totalRatings,
+        deliveryRadiuskm: vendor.deliveryRadiuskm,
+        location: vendor.location,
+        owner: {
+            firstName: owner.firstName,
+            lastName: owner.lastName,
+            phone: owner.phone,
+        },
+        todayMenu: todayMenu || null,
+    };
 };

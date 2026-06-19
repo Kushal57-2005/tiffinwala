@@ -11,7 +11,6 @@ export const authMiddleware = (
     res: Response,
     next: NextFunction,
 ) => {
-    console.log('Cookies:', req.cookies);
     const token = req.cookies?.token;
 
     if (!token) {

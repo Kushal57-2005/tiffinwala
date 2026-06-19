@@ -108,7 +108,6 @@ export const getTodayMenuService = async (
     session: 'lunch' | 'dinner',
 ) => {
     const today = getTodayUTC();
-    console.log('Querying menu for:', { vendorId, session, today });
 
     const result = await MenuItem.findOne({
         vendorId,
@@ -116,7 +115,6 @@ export const getTodayMenuService = async (
         date: today,
         isExpired: false,
     });
-    console.log('Result:', result);
     return result;
 };
 

@@ -866,11 +866,6 @@ export default function Register() {
                     
                     {/* Header */}
                     <div className="mb-6 relative">
-                        <div className="md:hidden flex items-center justify-center space-x-2 mb-6">
-                            <h1 className="font-display text-3xl font-extrabold text-charcoal">
-                                Tiffin<span className="text-spice">Wala</span>
-                            </h1>
-                        </div>
                         <h2 className="font-display text-3xl font-bold text-charcoal tracking-tight">
                             {step === 1 ? 'Create Account' : step === 2 ? 'Verify Phone' : 'Verify Email'}
                         </h2>

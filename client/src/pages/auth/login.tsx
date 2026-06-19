@@ -701,11 +701,6 @@ export default function Login() {
                 <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center relative">
                     {/* Header of credentials */}
                     <div className="mb-8 relative">
-                        <div className="md:hidden flex items-center justify-center space-x-2 mb-6">
-                            <h1 className="font-display text-3xl font-extrabold text-charcoal">
-                                Tiffin<span className="text-spice">Wala</span>
-                            </h1>
-                        </div>
                         <h2 className="font-display text-3xl font-bold text-charcoal tracking-tight">
                             {step === 1 ? 'Welcome Back' : 'Verify Identity'}
                         </h2>

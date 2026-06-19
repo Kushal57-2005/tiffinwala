@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../utils/api';
@@ -242,11 +243,7 @@ export default function ResetPassword() {
                 <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center relative">
                     {/* Header */}
                     <div className="mb-8 relative">
-                        <div className="md:hidden flex items-center justify-center space-x-2 mb-6">
-                            <h1 className="font-display text-3xl font-extrabold text-charcoal">
-                                Tiffin<span className="text-cinnamon">Wala</span>
-                            </h1>
-                        </div>
+
                         <h2 className="font-display text-3xl font-bold text-charcoal tracking-tight">
                             Reset Password
                         </h2>

@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
 import { api } from '../../utils/api';
+import { MobileNavbar } from '../../components/MobileNavbar';
+import { DashboardHeader } from '../../components/DashboardHeader';
 
 // ==========================================
 // TYPES & PROP INTERFACES
@@ -50,6 +52,7 @@ export interface Order {
   tiers: OrderTier[];
   addOns: OrderAddOn[];
   totalAmount: number;
+  paymentMethod?: 'wallet' | 'token';
   status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   coordinates: [number, number]; // [lng, lat]
   address: string;
@@ -1157,235 +1160,16 @@ export default function VendorHome({
       <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 relative z-10">
         {/* ==========================================
                     1. TOP BAR SECTION (Glassmorphic & Detailed)
-                   ========================================== */}
-        <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.15)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          {profileLoading ? (
-            <div className="flex items-center space-x-4 animate-pulse">
-              <div className="w-14 h-14 rounded-2xl bg-charcoal/10 shrink-0" />
-              <div className="text-left space-y-2">
-                <div className="h-2.5 w-16 bg-charcoal/10 rounded" />
-                <div className="h-6 w-40 bg-charcoal/10 rounded-lg" />
-                <div className="h-3 w-48 bg-charcoal/10 rounded" />
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-4">
-              {/* Interactive Avatar / Kitchen Badge */}
-              <button
-                onClick={() => setShowProfileModal(true)}
-                title="Edit Profile Settings"
-                className="w-14 h-14 rounded-2xl bg-spice/10 hover:bg-spice/20 border border-spice/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
-              >
-                <span className="text-2xl font-display font-extrabold text-spice select-none">
-                  {businessName ? getInitials(businessName) : 'A'}
-                </span>
-              </button>
-              <div className="text-center sm:text-left">
-                <p className="text-[10px] text-charcoal/50 font-bold uppercase tracking-wider font-body">
-                  {greeting}
-                </p>
-                <h1 className="font-display text-2xl md:text-3xl font-extrabold text-charcoal">
-                  {businessName}
-                </h1>
+                    ========================================== */}
+        <DashboardHeader
+          role="vendor"
+          passedName={businessName}
+          passedWalletBalance={walletBalance}
+          onProfileClick={() => setShowProfileModal(true)}
+        />
 
-                {/* Today's Date & Dynamic Stats inline line */}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-charcoal/60 mt-1 font-body">
-                  <span>{formattedDate}</span>
-                  <span className="w-1 h-1 rounded-full bg-charcoal/20" />
-                  <span>{orders.length} orders today</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-wrap justify-center sm:justify-end items-center gap-3 sm:gap-6 mt-4 sm:mt-0 w-full sm:w-auto">
-            {/* Wallet Balance Pill */}
-            {profileLoading ? (
-              <div className="h-[46px] w-[140px] bg-charcoal/10 rounded-2xl animate-pulse flex" />
-            ) : (
-              <div className="bg-spice/10 border border-spice/20 rounded-2xl px-4 py-2.5 flex items-center gap-2 select-none shadow-sm">
-                <svg
-                  className="w-4 h-4 text-spice"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                <div className="text-left font-body">
-                  <p className="text-[9px] uppercase tracking-wider font-bold text-charcoal/40 leading-none">
-                    Wallet Balance
-                  </p>
-                  <p className="text-sm font-extrabold text-spice leading-none mt-1">
-                    ₹{walletBalance.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Open/Close tactile animated switch with tactile ripple */}
-            <div className="flex items-center space-x-3 bg-charcoal/5 px-4 py-2.5 rounded-2xl border border-charcoal/10 relative overflow-visible select-none">
-              <span
-                className={`text-xs font-bold tracking-wider uppercase transition-colors duration-300 ${isOpen ? 'text-spice' : 'text-charcoal/55'}`}
-              >
-                {isOpen ? 'Open' : 'Closed'}
-              </span>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={handleStatusToggle}
-                  aria-label="Toggle store status"
-                  className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${
-                    isOpen ? 'bg-spice' : 'bg-charcoal/20'
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-all duration-300 shadow-md transform flex items-center justify-center ${
-                      isOpen ? 'translate-x-7' : 'translate-x-0'
-                    }`}
-                  >
-                    {/* Tactile detail indicator */}
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full transition-colors ${isOpen ? 'bg-spice' : 'bg-charcoal/30'}`}
-                    />
-                  </span>
-                </button>
-                {/* Radiating ripple ring */}
-                {ripple && (
-                  <span
-                    onAnimationEnd={() => setRipple(false)}
-                    className="absolute inset-0 -m-1 rounded-full bg-spice/30 animate-ripple pointer-events-none z-10"
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Connections Button */}
-            <button
-              onClick={() => navigate('/vendor/connections')}
-              title="My Connections"
-              className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-[#5C7A52]/10 hover:text-[#5C7A52] border border-charcoal/10 flex items-center justify-center text-charcoal/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            </button>
-
-            {/* Notification Bell */}
-            <div className="static sm:relative">
-              <button
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  if (notificationCount > 0) setNotificationCount(0); // clear indicator on click
-                }}
-                className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-cream/50 border border-charcoal/10 flex items-center justify-center text-charcoal/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm relative"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                  />
-                </svg>
-                {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-spice text-white text-[10px] font-bold flex items-center justify-center animate-pulse-dot border-2 border-cream">
-                    {notificationCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Dropdown panel */}
-              {showNotifications && (
-                <div className="absolute right-4 left-4 sm:right-0 sm:left-auto mt-3 sm:w-80 bg-white border border-charcoal/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
-                  <div className="flex justify-between items-center border-b border-charcoal/5 pb-2 mb-2">
-                    <h3 className="font-display font-bold text-sm text-charcoal">
-                      Notifications
-                    </h3>
-                    <button
-                      onClick={() => setShowNotifications(false)}
-                      className="text-[10px] text-spice hover:underline font-bold uppercase tracking-wider"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    <div className="text-xs p-2.5 rounded-xl hover:bg-cream/40 bg-spice/5 border border-spice/10 transition-colors">
-                      <p className="font-bold text-charcoal">
-                        New Order Received!
-                      </p>
-                      <p className="text-charcoal/60 mt-0.5">
-                        Aditya Patel ordered 2x Premium Lunch Box
-                      </p>
-                      <span className="text-[9px] text-charcoal/40 font-semibold block mt-1">
-                        12:30 PM
-                      </span>
-                    </div>
-                    <div className="text-xs p-2.5 rounded-xl hover:bg-cream/40 transition-colors">
-                      <p className="font-bold text-charcoal">Order accepted</p>
-                      <p className="text-charcoal/60 mt-0.5">
-                        You accepted Kushal Sharma's order
-                      </p>
-                      <span className="text-[9px] text-charcoal/40 font-semibold block mt-1">
-                        12:18 PM
-                      </span>
-                    </div>
-                    <div className="text-xs p-2.5 rounded-xl hover:bg-cream/40 transition-colors">
-                      <p className="font-bold text-charcoal">Menu Reminder</p>
-                      <p className="text-charcoal/60 mt-0.5">
-                        Don't forget to upload today's menu to accept orders.
-                      </p>
-                      <span className="text-[9px] text-charcoal/40 font-semibold block mt-1 font-body">
-                        11:00 AM
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              title="Log Out"
-              className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/20 border border-charcoal/10 flex items-center justify-center text-charcoal/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-            </button>
-          </div>
-        </header>
+        {/* Mobile Sub-Navbar */}
+        <MobileNavbar role="vendor" activeTab="home" />
 
         {/* Dashboard Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1396,9 +1180,45 @@ export default function VendorHome({
             className={`lg:col-span-5 space-y-6 transition-all duration-300 ${!isOpen ? 'opacity-65 grayscale-[35%]' : ''}`}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
-              <h2 className="font-display text-xl font-bold text-charcoal flex items-center space-x-2">
-                <span>Today's Culinary Pitch</span>
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-xl font-bold text-charcoal">
+                  Today's Culinary Pitch
+                </h2>
+                {/* Kitchen Status Toggle */}
+                <div className="flex items-center space-x-2 bg-white/70 border border-charcoal/10 px-3 py-1.5 rounded-xl shadow-sm relative overflow-visible select-none shrink-0">
+                  <span
+                    className={`text-[10px] font-bold tracking-wider uppercase transition-colors duration-300 ${isOpen ? 'text-spice' : 'text-charcoal/55'}`}
+                  >
+                    {isOpen ? 'Open' : 'Closed'}
+                  </span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={handleStatusToggle}
+                      aria-label="Toggle store status"
+                      className={`relative w-10 h-5 rounded-full transition-colors duration-300 focus:outline-none ${
+                        isOpen ? 'bg-spice' : 'bg-charcoal/20'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 shadow transform flex items-center justify-center ${
+                          isOpen ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full transition-colors ${isOpen ? 'bg-spice' : 'bg-charcoal/30'}`}
+                        />
+                      </span>
+                    </button>
+                    {ripple && (
+                      <span
+                        onAnimationEnd={() => setRipple(false)}
+                        className="absolute inset-0 -m-1 rounded-full bg-spice/30 animate-ripple pointer-events-none z-10"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Session selection tabs */}
               <div className="flex bg-charcoal/5 p-1 rounded-2xl border border-charcoal/10 select-none w-full sm:w-48 shrink-0">
@@ -2023,6 +1843,9 @@ export default function VendorHome({
                     badgeText = '✕ Rejected';
                   }
 
+                  const totalTiffins = order.tiers.reduce((sum, t) => sum + t.quantity, 0);
+                  const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * a.quantity, 0) : 0;
+
                   return (
                     <div
                       key={order._id}
@@ -2032,17 +1855,31 @@ export default function VendorHome({
                       {/* Top Row: Label & Price */}
                       <div className="flex justify-between items-start">
                         {/* Left: TIER-like label and Title */}
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                          <span className="text-[#e07a5f]">
-                            ORDER #{order._id.slice(-6).toUpperCase()}
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                            <span className="text-[#e07a5f]">
+                              ORDER #{order._id.slice(-6).toUpperCase()}
+                            </span>
+                            <span className="text-charcoal/20">•</span>
+                            <span className={timeColorClass}>{timeAgoText}</span>
+                          </div>
+                          <span className="text-[9px] font-bold text-charcoal/45 uppercase tracking-wider block">
+                            Paid via {order.paymentMethod === 'token' ? 'Subscription' : 'Wallet'}
                           </span>
-                          <span className="text-charcoal/20">•</span>
-                          <span className={timeColorClass}>{timeAgoText}</span>
                         </div>
 
                         {/* Right: Price */}
-                        <div className="text-xl font-display font-black text-charcoal tracking-tight leading-none">
-                          ₹{order.totalAmount}
+                        <div className="text-right flex flex-col items-end">
+                          <div className="text-xl font-display font-black text-charcoal tracking-tight leading-none">
+                            {order.paymentMethod === 'token' ? (
+                              <span>
+                                {totalTiffins} {totalTiffins === 1 ? 'Token' : 'Tokens'}
+                                {addOnsTotal > 0 && <span className="text-xs font-bold text-[#e07a5f] block mt-1">+ ₹{addOnsTotal}</span>}
+                              </span>
+                            ) : (
+                              <span>₹{order.totalAmount}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 

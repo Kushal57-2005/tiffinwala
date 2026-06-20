@@ -5,8 +5,11 @@ import ForgetPassword from './pages/auth/forget-password';
 import ResetPassword from './pages/auth/reset-password';
 import VendorHome from './pages/vendor/VendorHome';
 import VendorConnections from './pages/vendor/VendorConnections';
+import VendorSubscriptions from './pages/vendor/VendorSubscriptions';
+import { VendorRatings } from './pages/vendor/VendorRatings';
 import CustomerHome from './pages/customer/CustomerHome';
 import CustomerConnections from './pages/customer/CustomerConnections';
+import CustomerSubscriptions from './pages/customer/CustomerSubscriptions';
 
 function App() {
   return (
@@ -19,8 +22,11 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/vendor/home" element={<VendorHome />} />
         <Route path="/vendor/connections" element={<VendorConnections />} />
+        <Route path="/vendor/subscriptions" element={<VendorSubscriptions />} />
+        <Route path="/vendor/ratings" element={<VendorRatings />} />
         <Route path="/customer/home" element={<CustomerHome />} />
         <Route path="/customer/connections" element={<CustomerConnections />} />
+        <Route path="/customer/subscriptions" element={<CustomerSubscriptions />} />
       </Routes>
     </BrowserRouter>
   );

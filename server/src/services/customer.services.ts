@@ -78,7 +78,7 @@ export const getNearbyVendorService = async (userId: string) => {
         businessName: 1,
         isOpen: 1,
         averageRating: 1,
-        totalRating: 1,
+        totalRatings: 1,
         deliveryRadiuskm: 1,
         location: 1,
         distanceInMeters: 1,
@@ -133,7 +133,7 @@ export const updateCustomerLocationService = async (
     { new: true, runValidators: true },
   )
     .populate('userId', 'firstName lastName email phone')
-    .populate('myVendors', 'businessName');
+    .populate('myVendors', 'businessName isOpen averageRating totalRatings');
 
   if (!customer) {
     throw new ApiError(404, 'Customer not found');
@@ -160,7 +160,7 @@ export const searchVendorsService = async (query: string) => {
 export const getCustomerProfileService = async (userId: string) => {
   const customer = await Customer.findOne({ userId })
     .populate('userId', 'firstName lastName email phone')
-    .populate('myVendors', 'businessName');
+    .populate('myVendors', 'businessName isOpen averageRating totalRatings');
   if (!customer) {
     throw new ApiError(404, 'Customer not found');
   }
@@ -216,7 +216,7 @@ export const updateCustomerProfileService = async (
     { new: true, runValidators: true },
   )
     .populate('userId', 'firstName lastName email phone')
-    .populate('myVendors', 'businessName');
+    .populate('myVendors', 'businessName isOpen averageRating totalRatings');
 
   if (!customer) throw new ApiError(404, 'Customer not found');
 
@@ -365,6 +365,7 @@ export const getOrderForCustomerService = async (userId: string) => {
         addOns: 1,
         status: 1,
         totalAmount: 1,
+        paymentMethod: 1,
         forProfiles: 1,
         orderTime: '$createdAt',
       },

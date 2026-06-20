@@ -5,13 +5,15 @@ import vendorRoutes from './routes/vendor.routes';
 import customerRoutes from './routes/customer.routes';
 import orderRoutes from './routes/order.routes';
 import connectionRoutes from './routes/connection.routes';
+import subscriptionRoutes from './routes/subscription.routes';
+import ratingRoutes from './routes/rating.routes';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app = express();
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'https://tiffinwala-kkw.vercel.app'],
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://tiffinwala-kkw.vercel.app'],
     credentials: true,
   }),
 );
@@ -28,6 +30,8 @@ app.use('/api/vendor', vendorRoutes);
 app.use('/api/customer', customerRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/connections', connectionRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
   const statusCode = err.statusCode || 500;

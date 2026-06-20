@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
+import { MobileNavbar } from '../../components/MobileNavbar';
+import { DashboardHeader } from '../../components/DashboardHeader';
 
 // ==========================================
 // TYPES & PROP INTERFACES
@@ -19,6 +21,7 @@ export interface TodayOrder {
   addOns: { addOnName: string; quantity: number; pricePerUnit: number }[];
   status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   totalAmount: number;
+  paymentMethod?: 'wallet' | 'token';
   forProfiles: string[];
   orderTime: string;
 }
@@ -55,30 +58,6 @@ export interface CustomerHomeProps {
   initialWalletBalance?: number;
 }
 
-// ==========================================
-// DUMMY DATA
-// ==========================================
-
-const SAMPLE_MY_VENDORS = [
-  {
-    id: 'VND-001',
-    businessName: 'Annapurna Rasoi',
-    rating: 4.8,
-    initials: 'AR',
-  },
-  {
-    id: 'VND-002',
-    businessName: 'Maa Ka Swaad',
-    rating: 4.9,
-    initials: 'MS',
-  },
-  {
-    id: 'VND-003',
-    businessName: 'Shree Tiffin Services',
-    rating: 4.7,
-    initials: 'ST',
-  },
-];
 
 // Helper to map backend vendor object to frontend Vendor interface
 const mapBackendVendor = (v: any): Vendor => {
@@ -102,7 +81,7 @@ const mapBackendVendor = (v: any): Vendor => {
     rating:
       typeof v.averageRating === 'number' && v.averageRating > 0
         ? v.averageRating
-        : 4.5,
+        : 0,
     reviewsCount: typeof v.totalRatings === 'number' ? v.totalRatings : 0,
     distanceKm: distanceKm,
     isOpen: v.isOpen !== undefined ? v.isOpen : true,
@@ -294,11 +273,13 @@ export default function CustomerHome({
   // LOCAL STATES
   // ==========================================
   const [customerName, setCustomerName] = useState(initialCustomerName);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
   const [customerIdLocal, setCustomerIdLocal] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState(initialWalletBalance);
   const [profileLoading, setProfileLoading] = useState(true);
   const [friendProfiles, setFriendProfiles] = useState<any[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [myVendors, setMyVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [todayOrders, setTodayOrders] = useState<TodayOrder[]>([]);
@@ -316,6 +297,9 @@ export default function CustomerHome({
   // Modal states
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Order builder states inside modal
   const [orderQuantities, setOrderQuantities] = useState<
@@ -339,6 +323,16 @@ export default function CustomerHome({
   // Notification states
   const [notificationCount, setNotificationCount] = useState(2);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Rating modal states
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingVendorId, setRatingVendorId] = useState<string | null>(null);
+  const [ratingVendorName, setRatingVendorName] = useState('');
+  const [ratingStars, setRatingStars] = useState<number>(5);
+  const [ratingReview, setRatingReview] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [ratingSuccess, setRatingSuccess] = useState(false);
 
   // Profile modal states
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -385,6 +379,14 @@ export default function CustomerHome({
   const [addMoneyAmount, setAddMoneyAmount] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [addMoneyError, setAddMoneyError] = useState('');
+
+  // Subscription status calculations for current selected vendor
+  const matchingSubscription = activeSubscriptions.find((s) => {
+    const sVendorId = typeof s.vendorId === 'object' && s.vendorId !== null ? s.vendorId._id : s.vendorId;
+    return sVendorId?.toString() === selectedVendor?.id?.toString() && s.status === 'active' && s.remainingTokens > 0;
+  });
+  const tokensRemaining = matchingSubscription ? matchingSubscription.remainingTokens : 0;
+  const hasTokens = tokensRemaining > 0;
 
   // Track cursor movement for parallax
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -529,7 +531,7 @@ export default function CustomerHome({
     } finally {
       setIsProcessingPayment(false);
     }
-  };
+    };
 
   // Load customer profile details
   useEffect(() => {
@@ -548,6 +550,7 @@ export default function CustomerHome({
           }
           setWalletBalance(profile.walletBalance || 0);
           setFriendProfiles(profile.friendProfiles || []);
+          setMyVendors(profile.myVendors || []);
           // Pre-populate friends list from profile response
           if (profile.friendProfiles?.length > 0) {
             setFriends(profile.friendProfiles);
@@ -568,7 +571,18 @@ export default function CustomerHome({
         setProfileLoading(false);
       }
     };
+    const fetchSubscriptions = async () => {
+      try {
+        const res = await api.get('/subscriptions/my');
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setActiveSubscriptions(res.data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching subscriptions:', err);
+      }
+    };
     fetchProfile();
+    fetchSubscriptions();
   }, []);
 
   // Fetch Today's Orders
@@ -606,6 +620,51 @@ export default function CustomerHome({
       console.error('Failed to receive order', err);
     } finally {
       setReceivingOrderId(null);
+    }
+  };
+
+  const handleOpenRatingModal = (vendorId: string, businessName: string) => {
+    setRatingVendorId(vendorId);
+    setRatingVendorName(businessName);
+    setRatingStars(5);
+    setRatingReview('');
+    setRatingError(null);
+    setRatingSuccess(false);
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ratingVendorId) return;
+    setRatingSubmitting(true);
+    setRatingError(null);
+
+    try {
+      const res = await api.post('/ratings', {
+        vendorId: ratingVendorId,
+        stars: ratingStars,
+        review: ratingReview.trim() || undefined,
+      });
+
+      if (res.data.success) {
+        setRatingSuccess(true);
+        // Refresh nearby vendors / profile so the rating counts refresh immediately!
+        setNearbyReloadKey((key) => key + 1);
+        
+        // Auto close after 1.5s
+        setTimeout(() => {
+          setShowRatingModal(false);
+        }, 1500);
+      } else {
+        setRatingError(res.data.message || 'Failed to submit rating.');
+      }
+    } catch (err: any) {
+      console.error('Error submitting rating:', err);
+      setRatingError(
+        err.response?.data?.message || 'Failed to submit rating. Please try again.'
+      );
+    } finally {
+      setRatingSubmitting(false);
     }
   };
 
@@ -766,6 +825,17 @@ export default function CustomerHome({
     setSelectedFriends(['Myself']);
     setPaymentMethod('wallet');
 
+    // Refresh subscriptions list when opening modal to check latest token counts
+    try {
+      api.get('/subscriptions/my').then(res => {
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setActiveSubscriptions(res.data.data);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+
     setOrderQuantities({});
     setMenuLoading(true);
 
@@ -856,6 +926,26 @@ export default function CustomerHome({
     }
   };
 
+  const handleToggleReviews = async (vendorId: string) => {
+    if (showReviews) {
+      setShowReviews(false);
+      return;
+    }
+    
+    setShowReviews(true);
+    setReviewsLoading(true);
+    try {
+      const res = await api.get(`/ratings/vendor/${vendorId}`);
+      if (res.data?.success && res.data?.data) {
+        setReviews(res.data.data.result?.[0]?.ratings || []);
+      }
+    } catch (err) {
+      console.error('Error fetching reviews:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
   // Calculate total order value
   const calculateOrderTotal = () => {
     if (!selectedVendor) return 0;
@@ -923,6 +1013,8 @@ export default function CustomerHome({
         setTimeout(() => {
           setShowDetailModal(false);
           setSelectedVendor(null);
+          setShowReviews(false);
+          setReviews([]);
         }, 1500);
       }
     } catch (err: any) {
@@ -1229,215 +1321,22 @@ export default function CustomerHome({
         <div className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 relative z-10">
           {/* ==========================================
                     1. TOP BAR SECTION (Glassmorphic & Themed)
-                   ========================================== */}
-          <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.12)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            {profileLoading ? (
-              <div className="flex items-center space-x-4 animate-pulse">
-                <div className="w-14 h-14 rounded-2xl bg-charcoal/10 shrink-0" />
-                <div className="text-left space-y-2">
-                  <div className="h-2.5 w-16 bg-charcoal/10 rounded" />
-                  <div className="h-6 w-36 bg-charcoal/10 rounded-lg" />
-                  <div className="h-3 w-24 bg-charcoal/10 rounded" />
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-4">
-                {/* Interactive Avatar / Initials badge */}
-                <button
-                  onClick={() => {
-                    setShowProfileModal(true);
-                    setModalTab('profile');
-                    setFriendFormMode(null);
-                    setDeletingFriendId(null);
-                  }}
-                  title="Edit Profile & Friends"
-                  className="w-14 h-14 rounded-2xl bg-[#5C7A52]/10 hover:bg-[#5C7A52]/20 border border-[#5C7A52]/20 flex items-center justify-center shrink-0 shadow-sm transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer focus:outline-none"
-                >
-                  <span className="text-2xl font-display font-extrabold text-[#5C7A52] select-none">
-                    {customerName ? getInitials(customerName) : 'C'}
-                  </span>
-                </button>
-                <div className="text-center sm:text-left">
-                  <p className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
-                    {greeting}
-                  </p>
-                  <h1 className="font-display text-2xl md:text-3xl font-extrabold text-[#2B2118]">
-                    {customerName || 'Customer'}
-                  </h1>
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 text-xs text-[#2B2118]/60 mt-1 font-body">
-                    <span>{formattedDate}</span>
-                  </div>
-                </div>
-              </div>
-            )}
+                    ========================================== */}
+          <DashboardHeader
+            role="customer"
+            passedName={customerName}
+            passedWalletBalance={walletBalance}
+            onProfileClick={() => {
+              setShowProfileModal(true);
+              setModalTab('profile');
+              setFriendFormMode(null);
+              setDeletingFriendId(null);
+            }}
+            onAddMoneyClick={() => setShowAddMoneyModal(true)}
+          />
 
-            <div className="flex items-center gap-4">
-              {/* Wallet Balance Pill */}
-              {profileLoading ? (
-                <div className="h-[46px] w-[140px] bg-charcoal/10 rounded-2xl animate-pulse" />
-              ) : (
-                <div className="bg-[#5C7A52]/10 border border-[#5C7A52]/20 rounded-2xl pl-4 pr-2 py-2 flex items-center gap-3 select-none shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <svg
-                      className="w-4 h-4 text-[#5C7A52]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                      />
-                    </svg>
-                    <div className="text-left font-body">
-                      <p className="text-[9px] uppercase tracking-wider font-bold text-[#2B2118]/40 leading-none">
-                        Wallet Balance
-                      </p>
-                      <p className="text-sm font-extrabold text-[#5C7A52] leading-none mt-1">
-                        ₹{walletBalance.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="w-px h-6 bg-[#5C7A52]/20"></div>
-                  <button
-                    onClick={() => setShowAddMoneyModal(true)}
-                    className="w-8 h-8 rounded-xl bg-white hover:bg-[#5C7A52] hover:text-white border border-[#5C7A52]/20 text-[#5C7A52] flex items-center justify-center transition-all shadow-sm"
-                    title="Add Money to Wallet"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
-              {/* Connections Button */}
-              <button
-                onClick={() => navigate('/customer/connections')}
-                title="My Connections"
-                className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-[#5C7A52]/10 hover:text-[#5C7A52] border border-[#2B2118]/10 flex items-center justify-center text-[#2B2118]/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-              </button>
-
-              {/* Notification Bell */}
-              <div className="static sm:relative">
-                <button
-                  onClick={() => {
-                    setShowNotifications(!showNotifications);
-                    if (notificationCount > 0) setNotificationCount(0);
-                  }}
-                  className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-[#FBF4EC]/50 border border-[#2B2118]/10 flex items-center justify-center text-[#2B2118]/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm relative"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    />
-                  </svg>
-                  {notificationCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#5C7A52] text-white text-[10px] font-bold flex items-center justify-center animate-pulse-dot border-2 border-[#FBF4EC]">
-                      {notificationCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Dropdown panel */}
-                {showNotifications && (
-                  <div className="absolute right-4 left-4 sm:right-0 sm:left-auto mt-3 sm:w-80 bg-white border border-[#2B2118]/10 rounded-[24px] shadow-xl p-4 z-50 animate-scale-up">
-                    <div className="flex justify-between items-center border-b border-[#2B2118]/5 pb-2 mb-2">
-                      <h3 className="font-display font-bold text-sm text-[#2B2118]">
-                        Notifications
-                      </h3>
-                      <button
-                        onClick={() => setShowNotifications(false)}
-                        className="text-[10px] text-[#5C7A52] hover:underline font-bold uppercase tracking-wider"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      <div className="text-xs p-2.5 rounded-xl hover:bg-[#FBF4EC]/40 bg-[#5C7A52]/5 border border-[#5C7A52]/10 transition-colors">
-                        <p className="font-bold text-[#2B2118]">
-                          Order Accepted!
-                        </p>
-                        <p className="text-[#2B2118]/60 mt-0.5">
-                          Annapurna Rasoi has accepted your deluxe lunch
-                          request.
-                        </p>
-                        <span className="text-[9px] text-[#2B2118]/40 font-semibold block mt-1">
-                          Just Now
-                        </span>
-                      </div>
-                      <div className="text-xs p-2.5 rounded-xl hover:bg-[#FBF4EC]/40 transition-colors">
-                        <p className="font-bold text-[#2B2118]">
-                          New Vendor Nearby!
-                        </p>
-                        <p className="text-[#2B2118]/60 mt-0.5">
-                          Zaika Tiffin Corners is now delivering to your area.
-                        </p>
-                        <span className="text-[9px] text-[#2B2118]/40 font-semibold block mt-1">
-                          2 hours ago
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Logout Button */}
-              <button
-                onClick={handleLogout}
-                title="Log Out"
-                className="w-12 h-12 rounded-2xl bg-white/70 hover:bg-red-500/10 hover:text-red-600 hover:border-red-500/20 border border-[#2B2118]/10 flex items-center justify-center text-[#2B2118]/80 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-              </button>
-            </div>
-          </header>
+          {/* Mobile Sub-Navbar */}
+          <MobileNavbar role="customer" activeTab="home" />
 
           {/* Developer Toggles for empty state preview */}
           <div className="mt-2 mb-8 flex flex-wrap gap-4 items-center justify-start bg-amber-500/5 border border-dashed border-amber-500/35 backdrop-blur-md px-5 py-3.5 rounded-2xl text-xs font-semibold text-[#2B2118]/70 shadow-sm relative z-20">
@@ -1548,7 +1447,7 @@ export default function CustomerHome({
                     </div>
                   ))}
                 </div>
-              ) : simulateEmptyMyVendors || SAMPLE_MY_VENDORS.length === 0 ? (
+              ) : simulateEmptyMyVendors || myVendors.length === 0 ? (
                 /* Subscribed Vendors Empty State */
                 <div className="bg-white/30 backdrop-blur-md border border-[#2B2118]/10 border-dashed rounded-[32px] p-8 text-center flex flex-col items-center justify-center min-h-[180px] shadow-sm transition-all duration-300">
                   {/* Leaf themed Tiffin box SVG */}
@@ -1622,22 +1521,22 @@ export default function CustomerHome({
                 </div>
               ) : (
                 /* Horizontal Scroll Row of Vendor Cards */
-                <div className="flex gap-4 overflow-x-auto pb-3 pt-1 custom-scrollbar scroll-smooth">
-                  {SAMPLE_MY_VENDORS.map((mv) => (
+                <div className="flex gap-4 overflow-x-auto pb-3 pt-1 custom-scrollbar scroll-smooth font-body">
+                  {myVendors.map((mv) => (
                     <button
-                      key={mv.id}
+                      key={mv._id}
                       onClick={() => {
-                        let match = vendors.find((n) => n.id === mv.id);
+                        let match = vendors.find((n) => n.id === mv._id);
                         if (!match) {
                           match = {
-                            id: mv.id,
+                            id: mv._id,
                             businessName: mv.businessName,
                             ownerName: 'Vendor Kitchen',
-                            rating: mv.rating,
-                            reviewsCount: 12,
+                            rating: typeof mv.averageRating === 'number' ? mv.averageRating : 0,
+                            reviewsCount: mv.totalRatings || 0,
                             distanceKm: 1.0,
-                            isOpen: true,
-                            deliveryRadiusKm: 5,
+                            isOpen: mv.isOpen !== undefined ? mv.isOpen : true,
+                            deliveryRadiusKm: mv.deliveryRadiuskm || 5,
                             tiers: [],
                             addOns: [],
                             description: '',
@@ -1648,19 +1547,19 @@ export default function CustomerHome({
                       className="flex-shrink-0 bg-white/40 border border-white/30 backdrop-blur-md rounded-2xl p-4 flex items-center space-x-3 w-64 hover:border-[#5C7A52]/30 hover:bg-white/60 transition-all duration-300 hover:shadow-sm text-left group"
                     >
                       <div className="w-11 h-11 rounded-full bg-[#5C7A52]/10 border border-[#5C7A52]/20 flex items-center justify-center font-display font-bold text-[#5C7A52] shadow-inner select-none transition-transform group-hover:scale-105">
-                        {mv.initials}
+                        {getInitials(mv.businessName)}
                       </div>
-                      <div className="overflow-hidden">
+                      <div className="overflow-hidden font-body">
                         <h3 className="font-display font-bold text-sm text-charcoal truncate">
                           {mv.businessName}
                         </h3>
-                        <div className="flex items-center space-x-1.5 text-xs text-[#2B2118]/50 mt-0.5">
+                        <div className="flex items-center space-x-1.5 text-xs text-[#2B2118]/50 mt-0.5 font-body">
                           <span className="text-[#F2B340] font-bold">
-                            ★ {mv.rating}
+                            ★ {mv.averageRating > 0 ? mv.averageRating.toFixed(1) : 'New'}
                           </span>
                           <span>•</span>
                           <span className="text-[#5C7A52] font-semibold uppercase tracking-wider text-[9px]">
-                            Subscribed
+                            Connected
                           </span>
                         </div>
                       </div>
@@ -1756,6 +1655,9 @@ export default function CustomerHome({
                           break;
                       }
 
+                      const totalTiffins = order.tiers.reduce((sum, t) => sum + t.quantity, 0);
+                      const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * a.quantity, 0) : 0;
+
                       return (
                         <div
                           key={order._id}
@@ -1765,19 +1667,33 @@ export default function CustomerHome({
                             {/* Top Row: Label & Price */}
                             <div className="flex justify-between items-start">
                               {/* Left: TIER-like label and Title */}
-                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
-                                <span className="text-leaf">
-                                  ORDER #{order._id.slice(-6).toUpperCase()}
-                                </span>
-                                <span className="text-charcoal/20">•</span>
-                                <span className={timeColorClass}>
-                                  {timeAgoText}
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+                                  <span className="text-leaf">
+                                    ORDER #{order._id.slice(-6).toUpperCase()}
+                                  </span>
+                                  <span className="text-charcoal/20">•</span>
+                                  <span className={timeColorClass}>
+                                    {timeAgoText}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-bold text-charcoal/45 uppercase tracking-wider block">
+                                  Paid via {order.paymentMethod === 'token' ? 'Subscription' : 'Wallet'}
                                 </span>
                               </div>
 
                               {/* Right: Price */}
-                              <div className="text-xl font-display font-black text-charcoal tracking-tight leading-none">
-                                ₹{order.totalAmount}
+                              <div className="text-right flex flex-col items-end">
+                                <div className="text-xl font-display font-black text-charcoal tracking-tight leading-none">
+                                  {order.paymentMethod === 'token' ? (
+                                    <span>
+                                      {totalTiffins} {totalTiffins === 1 ? 'Token' : 'Tokens'}
+                                      {addOnsTotal > 0 && <span className="text-xs font-bold text-leaf block mt-1">+ ₹{addOnsTotal}</span>}
+                                    </span>
+                                  ) : (
+                                    <span>₹{order.totalAmount}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -1849,6 +1765,16 @@ export default function CustomerHome({
                                     {receivingOrderId === order._id
                                       ? '...'
                                       : 'Mark Received'}
+                                  </button>
+                                )}
+                                {order.status === 'received' && (
+                                  <button
+                                    onClick={() =>
+                                      handleOpenRatingModal(order.vendorId, order.businessName)
+                                    }
+                                    className="px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm text-white bg-[#5C7A52] hover:bg-[#5C7A52]/90 flex items-center gap-1 hover:scale-[1.03] active:scale-95 duration-200"
+                                  >
+                                    <span className="text-amber-400 text-xs">★</span> Rate Vendor
                                   </button>
                                 )}
                               </div>
@@ -2058,10 +1984,10 @@ export default function CustomerHome({
                             </div>
                             <div className="text-right">
                               <span className="text-xs font-bold text-[#F2B340]">
-                                ★ {vendor.rating}
+                                ★ {vendor.rating > 0 ? vendor.rating.toFixed(1) : 'New'}
                               </span>
                               <span className="text-[10px] text-charcoal/40 font-semibold block">
-                                ({vendor.reviewsCount} reviews)
+                                ({vendor.reviewsCount || 0} reviews)
                               </span>
                             </div>
                           </div>
@@ -2149,6 +2075,8 @@ export default function CustomerHome({
                 setShowDetailModal(false);
                 setSelectedVendor(null);
                 setOrderError(null);
+                setShowReviews(false);
+                setReviews([]);
               }
             }}
           >
@@ -2236,11 +2164,18 @@ export default function CustomerHome({
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-bold text-[#F2B340]">
-                      ★ {selectedVendor.rating}
+                      ★ {selectedVendor.rating > 0 ? selectedVendor.rating.toFixed(1) : 'New'}
                     </span>
                     <span className="text-[10px] text-cream/50 block font-semibold">
                       {selectedVendor.reviewsCount} reviews
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleReviews(selectedVendor.id)}
+                      className="text-[9px] uppercase tracking-wider font-extrabold text-amber-400 hover:underline cursor-pointer block mt-1"
+                    >
+                      {showReviews ? 'Hide Reviews' : 'Show Reviews'}
+                    </button>
                   </div>
                 </div>
 
@@ -2249,6 +2184,8 @@ export default function CustomerHome({
                     onClick={() => {
                       setShowDetailModal(false);
                       setSelectedVendor(null);
+                      setShowReviews(false);
+                      setReviews([]);
                     }}
                     className="absolute right-4 top-4 text-cream/70 hover:text-white transition-colors z-20"
                   >
@@ -2319,6 +2256,46 @@ export default function CustomerHome({
                       {selectedVendor.description}
                     </p>
                   </div>
+
+                  {/* Reviews Section */}
+                  {showReviews && (
+                    <div className="bg-white/40 border border-[#2B2118]/5 rounded-2xl p-4 space-y-3">
+                      <h4 className="text-[10px] text-[#5C7A52] font-black uppercase tracking-wider font-body">
+                        Customer Reviews ({selectedVendor.reviewsCount})
+                      </h4>
+                      {reviewsLoading ? (
+                        <div className="flex items-center gap-2 py-2">
+                          <div className="w-4 h-4 border-2 border-[#5C7A52]/20 border-t-[#5C7A52] animate-spin rounded-full" />
+                          <span className="text-xs text-[#2B2118]/50 italic font-body">Loading reviews...</span>
+                        </div>
+                      ) : reviews.length === 0 ? (
+                        <p className="text-xs text-[#2B2118]/50 italic font-body">No reviews yet for this vendor.</p>
+                      ) : (
+                        <div className="space-y-3 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                          {reviews.map((r, rIdx) => (
+                            <div key={rIdx} className="text-xs border-b border-charcoal/5 pb-2.5 last:border-0 last:pb-0 font-body">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-extrabold text-charcoal">{r.name || 'Anonymous Customer'}</span>
+                                <span className="text-amber-500 font-bold">★ {r.stars}</span>
+                              </div>
+                              {r.review && (
+                                <p className="text-charcoal/80 bg-white/20 rounded-lg p-2.5 border border-charcoal/5 italic mt-1 leading-relaxed">
+                                  "{r.review}"
+                                </p>
+                              )}
+                              <span className="text-[9px] text-charcoal/40 block mt-1 font-semibold">
+                                {new Date(r.createdAt).toLocaleDateString(undefined, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Menu Tiers (Read-Only) */}
                   <div className="space-y-4">
@@ -2574,27 +2551,41 @@ export default function CustomerHome({
                         >
                           Wallet
                         </button>
-                        <button
-                          type="button"
-                          disabled={true}
-                          title="Subscription Token mode locked"
-                          className="flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-xl text-charcoal/30 cursor-not-allowed flex items-center justify-center gap-1"
-                        >
-                          <svg
-                            className="w-2.5 h-2.5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                        {hasTokens ? (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('token')}
+                            className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all duration-300 ${
+                              paymentMethod === 'token'
+                                ? 'bg-[#5C7A52] text-white shadow-sm'
+                                : 'text-charcoal/50 hover:text-charcoal/80'
+                            }`}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                            />
-                          </svg>
-                          Token
-                        </button>
+                            Token ({tokensRemaining} left)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={true}
+                            title="Subscription Token mode locked"
+                            className="flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-xl text-charcoal/30 cursor-not-allowed flex items-center justify-center gap-1"
+                          >
+                            <svg
+                              className="w-2.5 h-2.5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
+                            </svg>
+                            Token
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3536,6 +3527,125 @@ export default function CustomerHome({
                       </button>
                     )}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rate Vendor Modal */}
+      {showRatingModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-[#2B2118]/60 backdrop-blur-md">
+          <div className="bg-[#FBF4EC] rounded-[28px] p-6 w-full max-w-sm relative shadow-[0_24px_70px_rgba(43,33,24,0.3)] animate-scale-up border border-[#2B2118]/10 overflow-hidden">
+            {/* Background Accent */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-[#5C7A52]/10 rounded-full blur-3xl -mr-20 -mt-20 z-0 pointer-events-none" />
+
+            <div className="relative z-10">
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="absolute -top-1 -right-1 p-2 bg-[#2B2118]/5 hover:bg-[#2B2118]/10 rounded-full text-[#2B2118]/50 transition-colors"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              <div className="mb-6">
+                <h3 className="font-display text-2xl font-bold text-[#2B2118]">
+                  Rate Vendor
+                </h3>
+                <p className="text-sm font-body text-[#2B2118]/60 mt-1">
+                  How was your experience with <span className="font-bold text-[#5C7A52]">{ratingVendorName}</span>?
+                </p>
+              </div>
+
+              {ratingError && (
+                <div className="mb-4 bg-red-50 text-red-600 text-xs font-bold p-3 rounded-xl border border-red-100">
+                  {ratingError}
+                </div>
+              )}
+
+              {ratingSuccess ? (
+                <div className="py-8 flex flex-col items-center justify-center text-center animate-scale-up">
+                  <div className="w-16 h-16 bg-[#5C7A52]/10 text-[#5C7A52] rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h4 className="font-display text-lg font-bold text-charcoal">Thank You!</h4>
+                  <p className="text-xs text-charcoal/60 mt-1">Your rating has been submitted successfully.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitRating} className="space-y-5">
+                  {/* Star Selector */}
+                  <div className="flex flex-col items-center gap-2 py-2">
+                    <label className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
+                      Select Stars
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRatingStars(star)}
+                          className="text-3xl focus:outline-none transition-transform active:scale-90 hover:scale-110"
+                        >
+                          <span
+                            className={star <= ratingStars ? 'text-amber-400' : 'text-[#2B2118]/15'}
+                          >
+                            ★
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <span className="text-xs font-bold font-body text-[#5C7A52] mt-1">
+                      {ratingStars === 1 && 'Terrible 😞'}
+                      {ratingStars === 2 && 'Bad 🙁'}
+                      {ratingStars === 3 && 'Average 😐'}
+                      {ratingStars === 4 && 'Good 🙂'}
+                      {ratingStars === 5 && 'Excellent! 😍'}
+                    </span>
+                  </div>
+
+                  {/* Review Textarea */}
+                  <div className="relative">
+                    <textarea
+                      value={ratingReview}
+                      onChange={(e) => setRatingReview(e.target.value)}
+                      rows={3}
+                      className="w-full bg-[#FBF4EC]/80 border border-[#2B2118]/15 text-[#2B2118] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:border-[#5C7A52] focus:ring-[#5C7A52]/20 transition-all font-body resize-none"
+                      placeholder="Write your review here... (optional)"
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowRatingModal(false)}
+                      className="flex-1 py-3 rounded-xl border border-[#2B2118]/15 text-[#2B2118]/60 hover:text-[#2B2118] hover:bg-[#2B2118]/5 text-xs font-bold font-body transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={ratingSubmitting}
+                      className="flex-1 py-3 rounded-xl bg-[#5C7A52] text-white hover:bg-[#5C7A52]/90 text-xs font-bold font-body shadow-sm hover:shadow transition-all disabled:opacity-50"
+                    >
+                      {ratingSubmitting ? 'Submitting...' : 'Submit Rating'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>

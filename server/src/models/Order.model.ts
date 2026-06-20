@@ -21,7 +21,7 @@ export interface IOrder extends Document {
   addOns: IOrderAddOn[];
   forProfiles: string[];
   totalAmount: number;
-  paymentMethod: 'wallet';
+  paymentMethod: 'wallet' | 'token';
   note?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   customerLocation: {
@@ -95,7 +95,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     paymentMethod: {
       type: String,
-      enum: ['wallet'],
+      enum: ['wallet','token'],
       default: 'wallet',
     },
     note: {

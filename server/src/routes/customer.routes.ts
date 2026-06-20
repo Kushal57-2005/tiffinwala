@@ -15,6 +15,7 @@ import {
   getOrderForCustomer,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
+import { getSubscriptionsPlansForCustomers } from '../controllers/subscription.contoller';
 
 const router = Router();
 
@@ -85,5 +86,12 @@ router.get(
   authMiddleware,
   requireRole('customer'),
   getOrderForCustomer,
+);
+
+router.get(
+  '/vendors/:vendorId/plans',
+  authMiddleware,
+  requireRole('customer'),
+  getSubscriptionsPlansForCustomers,
 );
 export default router;

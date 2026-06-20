@@ -6,6 +6,7 @@ import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
 import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
+import { Subscription } from '../models/Subscription.model';
 
 interface PlaceOrderInput {
   userId: string;
@@ -14,7 +15,7 @@ interface PlaceOrderInput {
   addOns?: { addOnName: string; quantity: number }[];
   forProfiles?: string[];
   note?: string;
-  paymentMethod?: 'wallet';
+  paymentMethod?: 'wallet' | 'token';
 }
 
 export const placeOrderService = async (input: PlaceOrderInput) => {
@@ -117,6 +118,7 @@ export const placeOrderService = async (input: PlaceOrderInput) => {
     0,
   );
 
+
   const totalAmount = tiersTotal + addOnsTotal;
 
   if (paymentMethod === 'wallet') {
@@ -128,7 +130,29 @@ export const placeOrderService = async (input: PlaceOrderInput) => {
     }
   }
 
+  if (paymentMethod === 'token') {
+    const token = await Subscription.findOne({
+      customerId: customer._id,
+      vendorId: vendor._id,
+      expiryDate: { $gte: today },
+    });
+    if (!token) throw new ApiError(404, 'Token are not valid or not found');
+    
+    const totalTiffins = tiers.reduce((sum, t) => sum + t.quantity, 0);
+    if (token.remainingTokens < totalTiffins) {
+      throw new ApiError(
+        400,
+        `Insufficient Tokens. Required: ${totalTiffins}, Available: ${token.remainingTokens}`,
+      );
+    }
 
+    if (customer.walletBalance < addOnsTotal) {
+      throw new ApiError(
+        400,
+        `Insufficient wallet balance for add-ons. Required: ₹${addOnsTotal}, Available: ₹${customer.walletBalance}`,
+      );
+    }
+  }
 
   const order = await Order.create({
     customerId: customer._id,
@@ -200,6 +224,7 @@ export const getOrdersDetailsService = async (vendorId: string) => {
         coordinates: '$customerLocation.coordinates',
         address: '$customerLocation.address',
         totalAmount: 1,
+        paymentMethod: 1,
         orderTime: '$createdAt',
       },
     },
@@ -251,12 +276,49 @@ export const acceptOrderService = async (orderId: string) => {
     // Deduct wallet
     const customer = await Customer.findById(order.customerId).session(session);
     if (!customer) throw new ApiError(404, 'Customer not found');
+    const vendor = await Vendor.findById(order.vendorId).session(session);
+    if (!vendor) throw new ApiError(404, 'Vendor not found');
 
     if (order.paymentMethod === 'wallet') {
       if (customer.walletBalance < order.totalAmount) {
         throw new ApiError(400, `Insufficient wallet balance`);
       }
       customer.walletBalance -= order.totalAmount;
+    }
+
+    if (order.paymentMethod === 'token') {
+      const today = getTodayUTC();
+      const token = await Subscription.findOne({
+        customerId: customer._id,
+        vendorId: vendor._id,
+        expiryDate: { $gte: today },
+      }).session(session);
+      if (!token) throw new ApiError(404, 'Token are not valid or not found');
+
+      const totalTiffins = order.tiers.reduce((sum, t) => sum + t.quantity, 0);
+      if (token.remainingTokens < totalTiffins) {
+        throw new ApiError(
+          400,
+          `Insufficient Token Balance. Required: ${totalTiffins}, Available: ${token.remainingTokens}`,
+        );
+      }
+      token.remainingTokens -= totalTiffins;
+      console.log(`Token Deducted remaining Token ${token.remainingTokens}`);
+      await token.save({ session });
+
+      const addOnsTotal = order.addOns.reduce(
+        (sum, a) => sum + a.pricePerUnit * a.quantity,
+        0,
+      );
+      if (addOnsTotal > 0) {
+        if (customer.walletBalance < addOnsTotal) {
+          throw new ApiError(
+            400,
+            `Insufficient wallet balance for add-ons. Required: ₹${addOnsTotal}, Available: ₹${customer.walletBalance}`,
+          );
+        }
+        customer.walletBalance -= addOnsTotal;
+      }
     }
 
     // Add vendor to customer's myVendors if it's a new vendor
@@ -340,8 +402,21 @@ export const receivedOrderService = async (orderId: string) => {
     const vendor = await Vendor.findById(order.vendorId).session(session);
     if (!vendor) throw new ApiError(404, 'Vendor not found');
 
-    vendor.walletBalance += order.totalAmount;
-    await vendor.save({ session });
+    if (order.paymentMethod === 'wallet') {
+      vendor.walletBalance += order.totalAmount;
+      await vendor.save({ session });
+    }
+
+    if (order.paymentMethod === 'token') {
+      const addOnsTotal = order.addOns.reduce(
+        (sum, a) => sum + a.pricePerUnit * a.quantity,
+        0,
+      );
+      if (addOnsTotal > 0) {
+        vendor.walletBalance += addOnsTotal;
+        await vendor.save({ session });
+      }
+    }
 
     await session.commitTransaction();
     session.endSession();

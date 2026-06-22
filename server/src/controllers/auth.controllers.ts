@@ -122,7 +122,7 @@ export const loginCustomer = asyncHandler(
             throw new ApiError(400, 'Email/Phone and password are required');
         }
 
-        const result = await loginCustomerService(emailOrPhone, password, res);
+        const result = await loginCustomerService(emailOrPhone, password);
 
         return res
             .status(200)
@@ -152,7 +152,7 @@ export const loginVendorStep2 = asyncHandler(
             throw new ApiError(400, 'userId and otp are required');
         }
 
-        const result = await loginVendorStep2Service(userId, otp, res);
+        const result = await loginVendorStep2Service(userId, otp);
 
         return res
             .status(200)
@@ -161,7 +161,7 @@ export const loginVendorStep2 = asyncHandler(
 );
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-    const result = await logoutService(res);
+    const result = await logoutService();
     return res.status(200).json(new ApiResponse(200, result, 'Logged out'));
 });
 

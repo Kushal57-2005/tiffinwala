@@ -225,7 +225,9 @@ export default function Login() {
                     emailOrPhone,
                     password,
                 });
-                setUser(res.data.data);
+                const { token, ...userData } = res.data.data;
+                localStorage.setItem('token', token);
+                setUser(userData);
                 navigate('/customer/home');
             } catch (err: any) {
                 const errMsg =
@@ -392,7 +394,9 @@ export default function Login() {
                 userId,
                 otp,
             });
-            setUser(res.data.data);
+            const { token, ...userData } = res.data.data;
+            localStorage.setItem('token', token);
+            setUser(userData);
             navigate('/vendor/home');
         } catch (err: any) {
             const errMsg =

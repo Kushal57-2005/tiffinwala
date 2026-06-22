@@ -3,10 +3,9 @@ import { User } from '../models/User.model';
 import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
 import { sendEmailOTP } from '../utils/email';
-import { generateToken, sendTokenCookie } from '../utils/jwt';
+import { generateToken } from '../utils/jwt';
 import { generateOTP, getOTPExpiry, isOTPExpired } from '../utils/otp';
 import { sendPhoneOTP } from '../utils/phone';
-import { Response } from 'express';
 import crypto from 'crypto';
 
 export const verifyPhoneOTPService = async (userId: string, otp: string) => {
@@ -174,7 +173,6 @@ export const registerVendorService = async (
 export const loginCustomerService = async (
     emailOrPhone: string,
     password: string,
-    res: Response,
 ) => {
     const user = await User.findOne({
         $or: [{ email: emailOrPhone }, { phone: emailOrPhone }],
@@ -195,9 +193,9 @@ export const loginCustomerService = async (
     }
 
     const token = generateToken(user._id.toString(), user.role);
-    sendTokenCookie(res, token);
 
     return {
+        token,
         userId: user._id,
         firstName: user.firstName,
         role: user.role,
@@ -250,7 +248,6 @@ export const loginVendorService = async (
 export const loginVendorStep2Service = async (
     userId: string,
     otp: string,
-    res: Response,
 ) => {
     const user = await User.findById(userId);
     if (!user) {
@@ -269,28 +266,19 @@ export const loginVendorStep2Service = async (
     await user.save();
 
     const token = generateToken(user._id.toString(), user.role);
-    sendTokenCookie(res, token);
 
     return {
+        token,
         userId: user._id,
         firstName: user.firstName,
         role: user.role,
     };
 };
 
-export const logoutService = async (res: Response) => {
-    const isProduction =
-        process.env.NODE_ENV === 'production' ||
-        process.env.RENDER === 'true' ||
-        !!(
-            process.env.CLIENT_URL &&
-            !process.env.CLIENT_URL.includes('localhost')
-        );
-    res.clearCookie('token', {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-    });
+
+export const logoutService = async () => {
+    // Bearer tokens are stateless — client clears from localStorage
+    // To revoke server-side, implement a token blacklist with Redis
     return { message: 'Logged out successfully' };
 };
 

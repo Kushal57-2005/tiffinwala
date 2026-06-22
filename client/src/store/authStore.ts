@@ -27,12 +27,18 @@ export const useAuthStore = create<AuthState>((set) => ({
                 isLoading: false,
             });
         } catch (error) {
+            localStorage.removeItem('token');
             set({ user: null, isAuthenticated: false, isLoading: false });
         }
     },
 
     logout: async () => {
-        await api.post('/auth/logout');
+        try {
+            await api.post('/auth/logout');
+        } catch {
+            // Ignore errors — we always clear local state
+        }
+        localStorage.removeItem('token');
         set({ user: null, isAuthenticated: false });
     },
 

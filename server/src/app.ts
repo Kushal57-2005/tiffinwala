@@ -12,9 +12,23 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
 const app = express();
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://tiffinwala-kkw.vercel.app',
+];
+
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174', 'https://tiffinwala-kkw.vercel.app'],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   }),
 );

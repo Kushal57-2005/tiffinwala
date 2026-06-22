@@ -362,11 +362,11 @@ export const VendorConnections: React.FC = () => {
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-spice/10 text-spice'
+                    className={`text-[10px] font-extrabold ml-1 ${
+                      isActive ? 'text-white' : 'text-spice'
                     }`}
                   >
-                    {tab.count}
+                    ({tab.count})
                   </span>
                 </button>
               );
@@ -436,8 +436,8 @@ export const VendorConnections: React.FC = () => {
                 <div className="px-1 flex items-center justify-between border-b border-[#2B2118]/5 pb-2">
                   <h2 className="font-display text-xl font-bold text-[#2B2118] flex items-center gap-2">
                     <span>Connected Customers</span>
-                    <span className="text-xs font-bold font-body px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800">
-                      {acceptedConnections.length} Active
+                    <span className="text-xs font-bold font-body text-emerald-800 select-none">
+                      ({acceptedConnections.length} Active)
                     </span>
                   </h2>
                 </div>
@@ -459,11 +459,6 @@ export const VendorConnections: React.FC = () => {
                           <div className="space-y-4">
                             <div className="flex justify-between items-start gap-4">
                               <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 rounded-xl bg-spice/10 border border-spice/20 flex items-center justify-center shrink-0">
-                                  <span className="text-xs font-display font-extrabold text-spice select-none">
-                                    {getInitials(userDetails.firstName, userDetails.lastName)}
-                                  </span>
-                                </div>
                                 <h3 className="font-display font-extrabold text-base text-[#2B2118] leading-tight group-hover:text-spice transition-colors">
                                   {fullName}
                                 </h3>
@@ -506,7 +501,7 @@ export const VendorConnections: React.FC = () => {
                                 </p>
                               </div>
                               {c.pendingDue > 0 && (
-                                <span className="px-2.5 py-1 bg-amber-500/10 text-amber-800 text-[10px] font-bold tracking-wider uppercase rounded-lg border border-amber-500/15 animate-pulse">
+                                <span className="text-amber-700 text-[10px] font-bold tracking-wider uppercase select-none">
                                   Pending Payment
                                 </span>
                               )}
@@ -526,8 +521,8 @@ export const VendorConnections: React.FC = () => {
                 <div className="px-1 flex items-center justify-between border-b border-[#2B2118]/5 pb-2">
                   <h2 className="font-display text-xl font-bold text-[#2B2118] flex items-center gap-2">
                     <span>Pending Requests</span>
-                    <span className="text-xs font-bold font-body px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-800">
-                      {pendingConnections.length} Pending
+                    <span className="text-xs font-bold font-body text-amber-800 select-none">
+                      ({pendingConnections.length} Pending)
                     </span>
                   </h2>
                 </div>
@@ -550,11 +545,6 @@ export const VendorConnections: React.FC = () => {
                           <div className="space-y-4">
                             <div className="flex justify-between items-start gap-4">
                               <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 rounded-xl bg-turmeric/10 border border-turmeric/20 flex items-center justify-center shrink-0">
-                                  <span className="text-xs font-display font-extrabold text-turmeric select-none">
-                                    {getInitials(userDetails.firstName, userDetails.lastName)}
-                                  </span>
-                                </div>
                                 <h3 className="font-display font-extrabold text-base text-[#2B2118] leading-tight group-hover:text-turmeric transition-colors">
                                   {fullName}
                                 </h3>

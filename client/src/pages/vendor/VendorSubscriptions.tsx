@@ -424,7 +424,7 @@ export const VendorSubscriptions: React.FC = () => {
                               ₹{(plan.price / plan.totalTokens).toFixed(1)} per token
                             </p>
                           </div>
-                          <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded border border-emerald-200 bg-emerald-50 text-emerald-700">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 select-none">
                             Active
                           </span>
                         </div>
@@ -520,15 +520,15 @@ export const VendorSubscriptions: React.FC = () => {
 
                             {/* Status Badge */}
                             {isExpired ? (
-                              <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-rose-200 bg-rose-50 text-rose-700 select-none shrink-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 select-none shrink-0">
                                 Expired
                               </span>
                             ) : isExhausted ? (
-                              <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-gray-300 bg-gray-100 text-gray-500 select-none shrink-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 select-none shrink-0">
                                 Exhausted
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 select-none shrink-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 select-none shrink-0">
                                 Active
                               </span>
                             )}

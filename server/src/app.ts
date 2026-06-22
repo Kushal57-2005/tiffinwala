@@ -7,6 +7,7 @@ import orderRoutes from './routes/order.routes';
 import connectionRoutes from './routes/connection.routes';
 import subscriptionRoutes from './routes/subscription.routes';
 import ratingRoutes from './routes/rating.routes';
+import notificationRoutes from './routes/notification.routes';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 
@@ -32,6 +33,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/connections', connectionRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/ratings', ratingRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
   const statusCode = err.statusCode || 500;

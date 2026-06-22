@@ -2,14 +2,16 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOrderTier {
   tierName: string;
-  quantity: number;
   pricePerUnit: number;
+  forProfile: string;
+  quantity: number;
 }
 
 export interface IOrderAddOn {
   addOnName: string;
-  quantity: number;
   pricePerUnit: number;
+  forProfile: string;
+  quantity: number;
 }
 
 export interface IOrder extends Document {
@@ -21,7 +23,7 @@ export interface IOrder extends Document {
   addOns: IOrderAddOn[];
   forProfiles: string[];
   totalAmount: number;
-  paymentMethod: 'wallet' | 'token';
+  paymentMethod: 'wallet' | 'token' | 'payLater';
   note?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   customerLocation: {
@@ -35,8 +37,9 @@ export interface IOrder extends Document {
 const OrderTierSchema = new Schema<IOrderTier>(
   {
     tierName: { type: String, required: true },
-    quantity: { type: Number, required: true, min: 1 },
     pricePerUnit: { type: Number, required: true },
+    forProfile: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1, default: 1 },
   },
   { _id: false },
 );
@@ -44,8 +47,9 @@ const OrderTierSchema = new Schema<IOrderTier>(
 const OrderAddOnSchema = new Schema<IOrderAddOn>(
   {
     addOnName: { type: String, required: true },
-    quantity: { type: Number, required: true, min: 1 },
     pricePerUnit: { type: Number, required: true },
+    forProfile: { type: String, required: true },
+    quantity: { type: Number, required: true, min: 1, default: 1 },
   },
   { _id: false },
 );
@@ -95,7 +99,7 @@ const OrderSchema = new Schema<IOrder>(
     },
     paymentMethod: {
       type: String,
-      enum: ['wallet','token'],
+      enum: ['wallet', 'token', 'payLater'],
       default: 'wallet',
     },
     note: {

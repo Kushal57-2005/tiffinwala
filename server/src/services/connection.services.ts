@@ -3,11 +3,14 @@ import { Connection } from '../models/Connection.model';
 import { Customer } from '../models/Customer.model';
 import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
+import { createNotification } from '../utils/notification';
+import { User } from '../models/User.model';
 
 export const requestConnectionService = async (
   userId: string,
   vendorId: string,
 ) => {
+  const user = await User.findById(userId);
   const customer = await Customer.findOne({ userId });
   if (!customer) throw new ApiError(404, 'Customer not found');
 
@@ -26,8 +29,21 @@ export const requestConnectionService = async (
         `Connection already ${existing.status} with this vendor`,
       );
     }
+    // Re-request after rejection
     existing.status = 'pending';
     await existing.save();
+
+    await createNotification({
+      userId: vendor.userId,
+      title: 'New Connection Request',
+      message: `${user?.firstName} ${user?.lastName} wants to connect with you for Pay-Later orders.`,
+      type: 'system',
+      data: {
+        connectionId: existing._id,
+        customerId: customer._id,
+      },
+    });
+
     return existing;
   }
 
@@ -35,6 +51,18 @@ export const requestConnectionService = async (
     customerId: customer._id,
     vendorId: vendor._id,
     status: 'pending',
+  });
+
+  // Notify vendor (use vendor.userId, not vendor._id)
+  await createNotification({
+    userId: vendor.userId,
+    title: 'New Connection Request',
+    message: `${user?.firstName} ${user?.lastName} wants to connect with you for Pay-Later orders.`,
+    type: 'system',
+    data: {
+      connectionId: connection._id,
+      customerId: customer._id,
+    },
   });
 
   return connection;
@@ -64,6 +92,32 @@ export const respondConnectionService = async (
 
   connection.status = action === 'accept' ? 'accepted' : 'rejected';
   await connection.save();
+
+  if (connection.status === 'accepted') {
+    // Notify customer: connection accepted
+    await createNotification({
+      userId: connection.customerId,
+      title: 'Connection Accepted ✓',
+      message: `${vendor.businessName} accepted your connection request. You can now place Pay-Later orders!`,
+      type: 'system',
+      data: {
+        vendorId: vendor._id,
+        connectionId: connection._id,
+      },
+    });
+  } else {
+    // Notify customer: connection rejected
+    await createNotification({
+      userId: connection.customerId,
+      title: 'Connection Request Declined',
+      message: `${vendor.businessName} declined your connection request. You can still place Wallet or Token orders.`,
+      type: 'system',
+      data: {
+        vendorId: vendor._id,
+        connectionId: connection._id,
+      },
+    });
+  }
 
   return connection;
 };
@@ -111,13 +165,45 @@ export const payDueService = async (userId: string, connectionId: string) => {
     }
 
     customer.walletBalance -= connection.pendingDue;
+    const amountPaid = connection.pendingDue;
     connection.pendingDue = 0;
 
     await customer.save({ session });
     await connection.save({ session });
 
+    // Fetch vendor to get userId for notification
+    const vendor = await Vendor.findById(connection.vendorId).session(session);
+
     await session.commitTransaction();
     session.endSession();
+
+    // Notify customer: payment confirmed
+    await createNotification({
+      userId: customer.userId,
+      title: 'Due Paid Successfully',
+      message: `₹${amountPaid} has been paid to ${vendor?.businessName || 'your vendor'}. Your pending due is now cleared.`,
+      type: 'payment',
+      data: {
+        connectionId: connection._id,
+        vendorId: connection.vendorId,
+        amountPaid,
+      },
+    });
+
+    // Notify vendor: payment received
+    if (vendor) {
+      await createNotification({
+        userId: vendor.userId,
+        title: 'Due Payment Received',
+        message: `A customer has paid ₹${amountPaid} towards their pending due.`,
+        type: 'payment',
+        data: {
+          connectionId: connection._id,
+          customerId: customer._id,
+          amountPaid,
+        },
+      });
+    }
 
     return connection;
   } catch (err) {

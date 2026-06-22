@@ -7,6 +7,7 @@ import { ApiError } from '../utils/api-error';
 import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
 import { MenuItem } from '../models/MenuItem.model';
+import { createNotification } from '../utils/notification';
 
 export const createSubscriptionPlanService = async (
   userId: string,
@@ -104,6 +105,33 @@ export const buyPlansService = async (
     );
 
     await session.commitTransaction();
+
+    // Notify customer about successful purchase
+    await createNotification({
+      userId: customer.userId,
+      title: 'Subscription Purchased!',
+      message: `You purchased the "${subscriptionPlan.name}" plan from ${vendor.businessName}. You now have ${subscriptionPlan.totalTokens} tokens. Enjoy your meals!`,
+      type: 'subscription',
+      data: {
+        subscriptionId: subscription[0]._id,
+        vendorId: vendor._id,
+        planName: subscriptionPlan.name,
+        tokens: subscriptionPlan.totalTokens,
+      },
+    });
+
+    // Notify vendor about new subscriber
+    await createNotification({
+      userId: vendor.userId,
+      title: 'New Subscriber!',
+      message: `A customer just purchased your "${subscriptionPlan.name}" subscription plan.`,
+      type: 'subscription',
+      data: {
+        subscriptionId: subscription[0]._id,
+        customerId: customer._id,
+        planName: subscriptionPlan.name,
+      },
+    });
 
     return subscription[0];
   } catch (error) {

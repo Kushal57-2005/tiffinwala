@@ -485,13 +485,13 @@ export const CustomerSubscriptions: React.FC = () => {
 
                       {/* Status Badge */}
                       {vendor.isOpen ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full border border-emerald-200 bg-emerald-500/10 text-emerald-800 select-none">
-                          <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 select-none">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           ACTIVE
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full border border-rose-200 bg-rose-500/10 text-rose-800 select-none">
-                          <span className="w-1 h-1 rounded-full bg-rose-500" />
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-rose-700 select-none">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           CLOSED
                         </span>
                       )}
@@ -591,15 +591,15 @@ export const CustomerSubscriptions: React.FC = () => {
 
                       {/* Status Badge */}
                       {isExpired ? (
-                        <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-rose-200 bg-rose-50 text-rose-700 select-none shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 select-none shrink-0">
                           Expired
                         </span>
                       ) : isExhausted ? (
-                        <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-gray-300 bg-gray-100 text-gray-500 select-none shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 select-none shrink-0">
                           Exhausted
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 select-none shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#5C7A52] select-none shrink-0">
                           Active
                         </span>
                       )}

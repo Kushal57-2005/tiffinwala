@@ -377,3 +377,184 @@ export const getOrderForCustomerService = async (userId: string) => {
 
   return orders;
 };
+
+export const customerDashboardService = async (
+  userId: string,
+  filter: string,
+) => {
+  const customer = await Customer.findOne({ userId });
+  if (!customer) throw new ApiError(404, 'Customer not found');
+
+  const end = new Date();
+  const start = new Date();
+
+  if (filter === 'week') {
+    start.setDate(start.getDate() - 7);
+  } else {
+    start.setDate(start.getDate() - 30);
+  }
+
+  start.setHours(0, 0, 0, 0);
+
+  const dashboard = await Order.aggregate([
+    {
+      $match: {
+        customerId: customer._id,
+        date: { $gte: start, $lte: end },
+      },
+    },
+
+    {
+      $facet: {
+        // 🔹 1. Total Tiffins
+        totalTiffins: [
+          { $unwind: '$tiers' },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$tiers.quantity' },
+            },
+          },
+        ],
+
+        // 🔹 2. Total Amount
+        totalAmount: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$totalAmount' },
+            },
+          },
+        ],
+
+        // 🔹 3. Vendor Breakdown
+        vendorStats: [
+          {
+            $group: {
+              _id: '$vendorId',
+              totalAmount: { $sum: '$totalAmount' },
+              tiers: { $push: '$tiers' },
+            },
+          },
+          { $unwind: '$tiers' },
+          { $unwind: '$tiers' },
+          {
+            $group: {
+              _id: '$_id',
+              totalAmount: { $first: '$totalAmount' },
+              totalTiffins: { $sum: '$tiers.quantity' },
+            },
+          },
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+          {
+            $project: {
+              vendorId: '$_id',
+              vendorName: '$vendor.businessName',
+              totalAmount: 1,
+              totalTiffins: 1,
+              _id: 0,
+            },
+          },
+        ],
+
+        // 🔹 4. Profile Breakdown
+        profileStats: [
+          {
+            $project: {
+              items: { $concatArrays: ['$tiers', '$addOns'] },
+            },
+          },
+          { $unwind: '$items' },
+          {
+            $match: {
+              'items.forProfile': { $ne: null },
+            },
+          },
+          {
+            $group: {
+              _id: '$items.forProfile',
+              totalQuantity: { $sum: '$items.quantity' },
+              totalAmount: {
+                $sum: {
+                  $multiply: ['$items.quantity', '$items.pricePerUnit'],
+                },
+              },
+            },
+          },
+          {
+            $project: {
+              profile: '$_id',
+              totalQuantity: 1,
+              totalAmount: 1,
+              _id: 0,
+            },
+          },
+        ],
+
+        // 🔹 5. Daily Breakdown
+        dailyBreakdown: [
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: 'vendorId',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+
+          {
+            $project: {
+              date: 1,
+              vendorName: '$vendor.businessName',
+
+              tiers: {
+                $map: {
+                  input: '$tiers',
+                  as: 't',
+                  in: {
+                    name: '$$t.tierName',
+                    quantity: '$$t.quantity',
+                    profile: '$$t.forProfile',
+                  },
+                },
+              },
+
+              addOns: {
+                $map: {
+                  input: '$addOns',
+                  as: 'a',
+                  in: {
+                    name: '$$a.addOnName',
+                    quantity: '$$a.quantity',
+                    profile: '$$a.forProfile',
+                  },
+                },
+              },
+            },
+          },
+
+          { $sort: { date: -1 } },
+        ],
+      },
+    },
+  ]);
+
+  const result = dashboard[0];
+
+  return {
+    totalTiffins: result.totalTiffins[0]?.total || 0,
+    totalAmount: result.totalAmount[0]?.total || 0,
+    vendorStats: result.vendorStats || [],
+    profileStats: result.profileStats || [],
+    dailyBreakdown: result.dailyBreakdown || [],
+  };
+};

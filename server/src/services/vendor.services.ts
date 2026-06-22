@@ -6,6 +6,7 @@ import { ApiError } from '../utils/api-error';
 import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
 import { Subscription } from '../models/Subscription.model';
+import { Order } from '../models/Order.model';
 
 export const toggleVendorOpenService = async (userId: string) => {
   const vendor = await Vendor.findOne({ userId });
@@ -195,7 +196,9 @@ export const getSubscribersService = async (userId: string) => {
   const vendor = await Vendor.findOne({ userId });
   if (!vendor) throw new ApiError(404, 'Vendor not found');
 
-  const subscriptions = await Subscription.find({ vendorId: vendor._id }).populate({
+  const subscriptions = await Subscription.find({
+    vendorId: vendor._id,
+  }).populate({
     path: 'customerId',
     populate: {
       path: 'userId',
@@ -203,4 +206,151 @@ export const getSubscribersService = async (userId: string) => {
     },
   });
   return subscriptions;
+};
+
+export const vendorDashboardService = async (
+  userId: string,
+  filter: string,
+) => {
+  const vendor = await Vendor.findOne({ userId });
+  if (!vendor) throw new ApiError(404, 'Vendor not found');
+
+  const end = new Date();
+  const start = new Date();
+
+  if (filter === 'week') {
+    start.setDate(start.getDate() - 7);
+  } else {
+    start.setDate(start.getDate() - 30);
+  }
+
+  start.setHours(0, 0, 0, 0);
+
+  const PLATFORM_FEE_PERCENT = 10;
+
+  const dashboard = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendor._id,
+        date: { $gte: start, $lte: end },
+      },
+    },
+
+    {
+      $facet: {
+        // 🔹 1. Total Tiffins Sold
+        totalTiffins: [
+          { $unwind: '$tiers' },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$tiers.quantity' },
+            },
+          },
+        ],
+
+        // 🔹 2. Revenue
+        totalRevenue: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$totalAmount' },
+            },
+          },
+        ],
+
+        // 🔹 3. Customer-wise sales
+        customerStats: [
+          {
+            $group: {
+              _id: '$customerId',
+              totalSpent: { $sum: '$totalAmount' },
+              orders: { $sum: 1 },
+            },
+          },
+          {
+            $lookup: {
+              from: 'customers',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'customer',
+            },
+          },
+          { $unwind: '$customer' },
+
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'customer.userId',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+
+          {
+            $project: {
+              customerId: '$_id',
+              name: {
+                $concat: ['$user.firstName', ' ', '$user.lastName'],
+              },
+              totalSpent: 1,
+              orders: 1,
+              _id: 0,
+            },
+          },
+        ],
+
+        // 🔹 4. Monthly Payslip
+        monthlyPayslip: [
+          {
+            $group: {
+              _id: {
+                year: { $year: '$date' },
+                month: { $month: '$date' },
+              },
+              revenue: { $sum: '$totalAmount' },
+            },
+          },
+          {
+            $project: {
+              year: '$_id.year',
+              month: '$_id.month',
+              revenue: 1,
+              platformFee: {
+                $multiply: ['$revenue', PLATFORM_FEE_PERCENT / 100],
+              },
+              netEarnings: {
+                $subtract: [
+                  '$revenue',
+                  {
+                    $multiply: ['$revenue', PLATFORM_FEE_PERCENT / 100],
+                  },
+                ],
+              },
+              _id: 0,
+            },
+          },
+          { $sort: { year: -1, month: -1 } },
+        ],
+      },
+    },
+  ]);
+
+  const result = dashboard[0];
+
+  const totalRevenue = result.totalRevenue[0]?.total || 0;
+  const totalTiffins = result.totalTiffins[0]?.total || 0;
+
+  const platformFee = (totalRevenue * PLATFORM_FEE_PERCENT) / 100;
+  const netEarnings = totalRevenue - platformFee;
+
+  return {
+    totalTiffins,
+    totalRevenue,
+    platformFee,
+    netEarnings,
+    customerStats: result.customerStats || [],
+    monthlyPayslip: result.monthlyPayslip || [],
+  };
 };

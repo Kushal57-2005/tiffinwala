@@ -357,11 +357,11 @@ export const CustomerConnections: React.FC = () => {
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-leaf/10 text-leaf'
+                    className={`text-[10px] font-extrabold ml-1 ${
+                      isActive ? 'text-white' : 'text-leaf'
                     }`}
                   >
-                    {tab.count}
+                    ({tab.count})
                   </span>
                 </button>
               );
@@ -437,8 +437,8 @@ export const CustomerConnections: React.FC = () => {
                 <div className="px-1 flex items-center justify-between border-b border-[#2B2118]/5 pb-2">
                   <h2 className="font-display text-xl font-bold text-[#2B2118] flex items-center gap-2">
                     <span>Connected Vendors</span>
-                    <span className="text-xs font-bold font-body px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-800">
-                      {acceptedConnections.length} Active
+                    <span className="text-xs font-bold font-body text-emerald-800 select-none">
+                      ({acceptedConnections.length} Active)
                     </span>
                   </h2>
                 </div>
@@ -468,8 +468,8 @@ export const CustomerConnections: React.FC = () => {
                 <div className="px-1 flex items-center justify-between border-b border-[#2B2118]/5 pb-2">
                   <h2 className="font-display text-xl font-bold text-[#2B2118] flex items-center gap-2">
                     <span>Pending Requests</span>
-                    <span className="text-xs font-bold font-body px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-800">
-                      {pendingConnections.length} Pending
+                    <span className="text-xs font-bold font-body text-amber-800 select-none">
+                      ({pendingConnections.length} Pending)
                     </span>
                   </h2>
                 </div>
@@ -494,8 +494,8 @@ export const CustomerConnections: React.FC = () => {
                 <div className="px-1 flex items-center justify-between border-b border-[#2B2118]/5 pb-2">
                   <h2 className="font-display text-xl font-bold text-[#2B2118] flex items-center gap-2">
                     <span>Connect with Past Vendors</span>
-                    <span className="text-xs font-bold font-body px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-800">
-                      {unconnectedVendors.length} Available
+                    <span className="text-xs font-bold font-body text-indigo-800 select-none">
+                      ({unconnectedVendors.length} Available)
                     </span>
                   </h2>
                 </div>

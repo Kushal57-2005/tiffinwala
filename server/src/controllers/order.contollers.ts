@@ -15,7 +15,7 @@ import {
 export const placeOrder = asyncHandler(
   async (req: AuthRequest, res: Response) => {
     const userId = req.user?.userId as string;
-    const { vendorId, tiers, addOns, forProfiles, note, paymentMethod } =
+    const { vendorId, tiers, addOns, note, paymentMethod } =
       req.body;
 
     if (!vendorId) throw new ApiError(400, 'vendorId is required');
@@ -28,7 +28,6 @@ export const placeOrder = asyncHandler(
       vendorId,
       tiers,
       addOns,
-      forProfiles,
       note,
       paymentMethod,
     });

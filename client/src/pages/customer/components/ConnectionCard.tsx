@@ -63,9 +63,9 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 </p>
               </div>
               {hasDue && (
-                <div className="px-2.5 py-1 bg-amber-500/10 text-amber-800 text-[10px] font-bold tracking-wider uppercase rounded-lg border border-amber-500/15">
+                <span className="text-amber-700 text-[10px] font-bold tracking-wider uppercase select-none">
                   Overdue
-                </div>
+                </span>
               )}
             </div>
           </>

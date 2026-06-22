@@ -5,6 +5,7 @@ import {
   getVendorProfileService,
   toggleVendorOpenService,
   updateVendorProfileService,
+  vendorDashboardService,
 } from '../services/vendor.services';
 import { asyncHandler } from '../utils/async-handler';
 import { ApiError } from '../utils/api-error';
@@ -153,5 +154,17 @@ export const getSubscribersPlans = asyncHandler(
     return res
       .status(200)
       .json(new ApiResponse(200, result, 'All Plans are fetch successfully'));
+  },
+);
+
+export const vendorDashboard = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId as string;
+    const filter = req.query.filter === 'week' ? 'week' : 'month';
+    const result = await vendorDashboardService(userId, filter);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, 'Vendor dashboard Fetched'));
   },
 );

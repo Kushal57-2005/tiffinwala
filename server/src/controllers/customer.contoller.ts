@@ -1,5 +1,6 @@
 import {
   addFriendProfileService,
+  customerDashboardService,
   editFriendProfileService,
   getCustomerProfileService,
   getFriendProfilesService,
@@ -191,5 +192,17 @@ export const getOrderForCustomer = asyncHandler(
     return res
       .status(200)
       .json(new ApiResponse(200, result, 'Orders are fetched'));
+  },
+);
+
+export const customerDashboard = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId as string;
+    const filter = req.query.filter === 'week' ? 'week' : 'month';
+    const result = await customerDashboardService(userId, filter);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, 'Customer dashboard Fetched'));
   },
 );

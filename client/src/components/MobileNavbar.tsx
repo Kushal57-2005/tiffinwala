@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 
 interface MobileNavbarProps {
   role: 'customer' | 'vendor';
-  activeTab: 'home' | 'subscriptions' | 'connections' | 'ratings' | 'none';
+  activeTab:
+    | 'home'
+    | 'subscriptions'
+    | 'connections'
+    | 'ratings'
+    | 'dashboard'
+    | 'none';
 }
 
 export const MobileNavbar: React.FC<MobileNavbarProps> = ({
@@ -14,10 +20,16 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
   const isCustomer = role === 'customer';
 
   // Theme styling based on role
-  const activeBg = isCustomer ? 'bg-[#5C7A52] text-white shadow-[0_4px_12px_rgba(92,122,82,0.18)]' : 'bg-[#E0653A] text-white shadow-[0_4px_12px_rgba(224,101,58,0.18)]';
-  const hoverBg = isCustomer ? 'hover:bg-[#5C7A52]/10 hover:text-[#5C7A52]' : 'hover:bg-[#E0653A]/10 hover:text-[#E0653A]';
+  const activeBg = isCustomer
+    ? 'bg-[#5C7A52] text-white shadow-[0_4px_12px_rgba(92,122,82,0.18)]'
+    : 'bg-[#E0653A] text-white shadow-[0_4px_12px_rgba(224,101,58,0.18)]';
+  const hoverBg = isCustomer
+    ? 'hover:bg-[#5C7A52]/10 hover:text-[#5C7A52]'
+    : 'hover:bg-[#E0653A]/10 hover:text-[#E0653A]';
   const homePath = isCustomer ? '/customer/home' : '/vendor/home';
-  const subPath = isCustomer ? '/customer/subscriptions' : '/vendor/subscriptions';
+  const subPath = isCustomer
+    ? '/customer/subscriptions'
+    : '/vendor/subscriptions';
   const connPath = isCustomer ? '/customer/connections' : '/vendor/connections';
   const ratingsPath = '/vendor/ratings';
 
@@ -27,7 +39,9 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
       <button
         onClick={() => navigate(homePath)}
         className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
-          activeTab === 'home' ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+          activeTab === 'home'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
         }`}
         title="Home Dashboard"
       >
@@ -46,11 +60,42 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
         </svg>
       </button>
 
+      {/* Dashboard Button */}
+      <button
+        onClick={() =>
+          navigate(isCustomer ? '/customer/dashboard' : '/vendor/dashboard')
+        }
+        className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+          activeTab === 'dashboard'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
+        }`}
+        title={
+          isCustomer ? 'My Activity Dashboard' : 'Business Analytics Dashboard'
+        }
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      </button>
+
       {/* Subscriptions Button */}
       <button
         onClick={() => navigate(subPath)}
         className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
-          activeTab === 'subscriptions' ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+          activeTab === 'subscriptions'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
         }`}
         title="Subscription Management"
       >
@@ -73,7 +118,9 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
       <button
         onClick={() => navigate(connPath)}
         className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
-          activeTab === 'connections' ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+          activeTab === 'connections'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
         }`}
         title="My Connections"
       >
@@ -97,7 +144,9 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
         <button
           onClick={() => navigate(ratingsPath)}
           className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
-            activeTab === 'ratings' ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+            activeTab === 'ratings'
+              ? activeBg
+              : 'bg-white/70 text-charcoal/80 ' + hoverBg
           }`}
           title="Customer Ratings & Reviews"
         >

@@ -17,12 +17,12 @@ export interface TodayOrder {
   vendorId: string;
   businessName: string;
   session: 'lunch' | 'dinner';
-  tiers: { tierName: string; quantity: number; pricePerUnit: number }[];
-  addOns: { addOnName: string; quantity: number; pricePerUnit: number }[];
+  tiers: { tierName: string; pricePerUnit: number; forProfile: string; quantity?: number }[];
+  addOns: { addOnName: string; pricePerUnit: number; forProfile: string; quantity?: number }[];
   status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   totalAmount: number;
   paymentMethod?: 'wallet' | 'token';
-  forProfiles: string[];
+  forProfiles?: string[];
   orderTime: string;
 }
 
@@ -274,7 +274,10 @@ export default function CustomerHome({
   // ==========================================
   const [customerName, setCustomerName] = useState(initialCustomerName);
   const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
+  const [connections, setConnections] = useState<any[]>([]);
   const [customerIdLocal, setCustomerIdLocal] = useState<string | null>(null);
+  const [dbCustomerId, setDbCustomerId] = useState<string | null>(null);
+  const [ratedVendorIds, setRatedVendorIds] = useState<string[]>([]);
   const [walletBalance, setWalletBalance] = useState(initialWalletBalance);
   const [profileLoading, setProfileLoading] = useState(true);
   const [friendProfiles, setFriendProfiles] = useState<any[]>([]);
@@ -302,11 +305,23 @@ export default function CustomerHome({
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
   // Order builder states inside modal
-  const [orderQuantities, setOrderQuantities] = useState<
-    Record<string, number>
-  >({});
-  const [selectedFriends, setSelectedFriends] = useState<string[]>(['Myself']);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'token'>(
+  interface OrderTierItem {
+    id: string;
+    tierName: string;
+    forProfile: string;
+    quantity: number;
+  }
+
+  interface OrderAddOnItem {
+    id: string;
+    addOnName: string;
+    forProfile: string;
+    quantity: number;
+  }
+
+  const [orderTierItems, setOrderTierItems] = useState<OrderTierItem[]>([]);
+  const [orderAddOnItems, setOrderAddOnItems] = useState<OrderAddOnItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'token' | 'payLater'>(
     'wallet',
   );
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -541,6 +556,7 @@ export default function CustomerHome({
         const res = await api.get('/customer/profile');
         if (res.data.success && res.data.data) {
           const profile = res.data.data;
+          setDbCustomerId(profile._id);
           const fullName = profile.userId
             ? `${profile.userId.firstName} ${profile.userId.lastName}`
             : 'Customer';
@@ -581,8 +597,19 @@ export default function CustomerHome({
         console.error('Error fetching subscriptions:', err);
       }
     };
+    const fetchConnections = async () => {
+      try {
+        const res = await api.get('/connections/my');
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setConnections(res.data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching connections:', err);
+      }
+    };
     fetchProfile();
     fetchSubscriptions();
+    fetchConnections();
   }, []);
 
   // Fetch Today's Orders
@@ -604,6 +631,36 @@ export default function CustomerHome({
     };
     fetchTodayOrders();
   }, []);
+
+  // Check rated status for vendors in received orders
+  useEffect(() => {
+    if (!todayOrders || todayOrders.length === 0 || !dbCustomerId) return;
+
+    const receivedVendors = Array.from(
+      new Set(
+        todayOrders
+          .filter((o) => o.status === 'received')
+          .map((o) => o.vendorId)
+      )
+    );
+
+    receivedVendors.forEach(async (vId) => {
+      try {
+        const res = await api.get(`/ratings/vendor/${vId}`);
+        if (res.data?.success && res.data?.data) {
+          const ratingsList = res.data.data.result?.[0]?.ratings || [];
+          const hasRated = ratingsList.some(
+            (r: any) => r.customerId?.toString() === dbCustomerId.toString()
+          );
+          if (hasRated) {
+            setRatedVendorIds((prev) => Array.from(new Set([...prev, vId])));
+          }
+        }
+      } catch (err) {
+        console.error('Error checking rating status:', err);
+      }
+    });
+  }, [todayOrders, dbCustomerId]);
 
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
 
@@ -648,6 +705,9 @@ export default function CustomerHome({
 
       if (res.data.success) {
         setRatingSuccess(true);
+        if (ratingVendorId) {
+          setRatedVendorIds((prev) => Array.from(new Set([...prev, ratingVendorId])));
+        }
         // Refresh nearby vendors / profile so the rating counts refresh immediately!
         setNearbyReloadKey((key) => key + 1);
         
@@ -822,7 +882,6 @@ export default function CustomerHome({
     setShowDetailModal(true);
     setOrderSuccess(false);
     setOrderSubmitting(false);
-    setSelectedFriends(['Myself']);
     setPaymentMethod('wallet');
 
     // Refresh subscriptions list when opening modal to check latest token counts
@@ -832,11 +891,17 @@ export default function CustomerHome({
           setActiveSubscriptions(res.data.data);
         }
       });
+      api.get('/connections/my').then(res => {
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setConnections(res.data.data);
+        }
+      });
     } catch (e) {
       console.error(e);
     }
 
-    setOrderQuantities({});
+    setOrderTierItems([]);
+    setOrderAddOnItems([]);
     setMenuLoading(true);
 
     try {
@@ -895,32 +960,35 @@ export default function CustomerHome({
 
       setSelectedVendor(updatedVendor);
 
-      // Re-populate quantities
-      const initialQuants: Record<string, number> = {};
-      updatedVendor.tiers.forEach((t) => {
-        initialQuants[t.name] = 0;
-      });
-      updatedVendor.addOns.forEach((ad) => {
-        initialQuants[ad.name] = 0;
-      });
       if (updatedVendor.tiers.length > 0) {
-        initialQuants[updatedVendor.tiers[0].name] = 1;
+        setOrderTierItems([
+          {
+            id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+            tierName: updatedVendor.tiers[0].name,
+            forProfile: 'Myself',
+            quantity: 1,
+          },
+        ]);
+      } else {
+        setOrderTierItems([]);
       }
-      setOrderQuantities(initialQuants);
+      setOrderAddOnItems([]);
     } catch (err) {
       console.error('Error fetching vendor details:', err);
       // Fallback: keep current presets
-      const initialQuants: Record<string, number> = {};
-      vendor.tiers.forEach((t) => {
-        initialQuants[t.name] = 0;
-      });
-      vendor.addOns.forEach((ad) => {
-        initialQuants[ad.name] = 0;
-      });
       if (vendor.tiers.length > 0) {
-        initialQuants[vendor.tiers[0].name] = 1;
+        setOrderTierItems([
+          {
+            id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+            tierName: vendor.tiers[0].name,
+            forProfile: 'Myself',
+            quantity: 1,
+          },
+        ]);
+      } else {
+        setOrderTierItems([]);
       }
-      setOrderQuantities(initialQuants);
+      setOrderAddOnItems([]);
     } finally {
       setMenuLoading(false);
     }
@@ -950,22 +1018,19 @@ export default function CustomerHome({
   const calculateOrderTotal = () => {
     if (!selectedVendor) return 0;
     let total = 0;
-    selectedVendor.tiers.forEach((t) => {
-      total += (orderQuantities[t.name] || 0) * t.price;
+    orderTierItems.forEach((item) => {
+      const tier = selectedVendor.tiers.find((t) => t.name === item.tierName);
+      if (tier) {
+        total += tier.price * (item.quantity || 1);
+      }
     });
-    selectedVendor.addOns.forEach((ad) => {
-      total += (orderQuantities[ad.name] || 0) * ad.price;
+    orderAddOnItems.forEach((item) => {
+      const addon = selectedVendor.addOns.find((a) => a.name === item.addOnName);
+      if (addon) {
+        total += addon.price * (item.quantity || 1);
+      }
     });
     return total;
-  };
-
-  // Handle quantity steppers
-  const updateQuantity = (key: string, delta: number) => {
-    setOrderQuantities((prev) => {
-      const current = prev[key] || 0;
-      const newVal = Math.max(0, current + delta);
-      return { ...prev, [key]: newVal };
-    });
   };
 
   // Handle submitting simulated order
@@ -974,9 +1039,7 @@ export default function CustomerHome({
 
     if (!selectedVendor) return;
 
-    const total = calculateOrderTotal();
-
-    if (total === 0) {
+    if (orderTierItems.length === 0) {
       setOrderError('Please select at least one item to order.');
       return;
     }
@@ -985,25 +1048,22 @@ export default function CustomerHome({
     setOrderSubmitting(true);
 
     try {
-      const tiers = selectedVendor.tiers
-        .filter((t) => (orderQuantities[t.name] || 0) > 0)
-        .map((t) => ({
-          tierName: t.name,
-          quantity: orderQuantities[t.name],
-        }));
+      const tiers = orderTierItems.map((item) => ({
+        tierName: item.tierName,
+        forProfile: item.forProfile,
+        quantity: item.quantity || 1,
+      }));
 
-      const addOns = selectedVendor.addOns
-        .filter((a) => (orderQuantities[a.name] || 0) > 0)
-        .map((a) => ({
-          addOnName: a.name,
-          quantity: orderQuantities[a.name],
-        }));
+      const addOns = orderAddOnItems.map((item) => ({
+        addOnName: item.addOnName,
+        forProfile: item.forProfile,
+        quantity: item.quantity || 1,
+      }));
 
       const res = await api.post('/orders', {
         vendorId: selectedVendor.id,
         tiers,
         addOns,
-        forProfiles: selectedFriends,
         paymentMethod,
       });
 
@@ -1655,8 +1715,8 @@ export default function CustomerHome({
                           break;
                       }
 
-                      const totalTiffins = order.tiers.reduce((sum, t) => sum + t.quantity, 0);
-                      const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * a.quantity, 0) : 0;
+                      const totalTiffins = order.tiers.reduce((sum, t) => sum + (t.quantity || 1), 0);
+                      const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * (a.quantity || 1), 0) : 0;
 
                       return (
                         <div
@@ -1708,16 +1768,21 @@ export default function CustomerHome({
                               </div>
 
                               <div className="flex flex-col gap-1 mt-0.5">
-                                {order.tiers.map((t, idx) => (
+                                {Object.entries(
+                                  order.tiers.reduce((acc, t) => {
+                                    acc[t.tierName] = (acc[t.tierName] || 0) + (t.quantity || 1);
+                                    return acc;
+                                  }, {} as Record<string, number>)
+                                ).map(([tierName, qty], idx) => (
                                   <div
                                     key={idx}
                                     className="flex items-baseline gap-2"
                                   >
                                     <span className="text-leaf/80 font-bold text-xs">
-                                      {t.quantity}x
+                                      {qty}x
                                     </span>
                                     <span className="font-display font-black text-charcoal text-[22px] tracking-tight leading-none">
-                                      {t.tierName}
+                                      {tierName}
                                     </span>
                                   </div>
                                 ))}
@@ -1767,16 +1832,31 @@ export default function CustomerHome({
                                       : 'Mark Received'}
                                   </button>
                                 )}
-                                {order.status === 'received' && (
-                                  <button
-                                    onClick={() =>
-                                      handleOpenRatingModal(order.vendorId, order.businessName)
-                                    }
-                                    className="px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm text-white bg-[#5C7A52] hover:bg-[#5C7A52]/90 flex items-center gap-1 hover:scale-[1.03] active:scale-95 duration-200"
-                                  >
-                                    <span className="text-amber-400 text-xs">★</span> Rate Vendor
-                                  </button>
-                                )}
+                                {order.status === 'received' && (() => {
+                                  const isRated = ratedVendorIds.includes(order.vendorId);
+                                  return (
+                                    <button
+                                      onClick={() =>
+                                        handleOpenRatingModal(order.vendorId, order.businessName)
+                                      }
+                                      className={`px-4 py-2 text-xs font-bold rounded-lg transition-all shadow-sm flex items-center gap-1 hover:scale-[1.03] active:scale-95 duration-200 ${
+                                        isRated
+                                          ? 'bg-transparent text-[#5C7A52] border border-[#5C7A52]/35 hover:bg-[#5C7A52]/5'
+                                          : 'text-white bg-[#5C7A52] hover:bg-[#5C7A52]/90'
+                                      }`}
+                                    >
+                                      {isRated ? (
+                                        <>
+                                          <span className="text-leaf text-xs font-bold">✓</span> Rated
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="text-amber-400 text-xs">★</span> Rate Vendor
+                                        </>
+                                      )}
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -2305,34 +2385,39 @@ export default function CustomerHome({
 
                     {selectedVendor.tiers.length > 0 ? (
                       selectedVendor.tiers.map((tier, idx) => {
-                        const qty = orderQuantities[tier.name] || 0;
+                        const tierItems = orderTierItems.filter((item) => item.tierName === tier.name);
+                        const isChecked = tierItems.length > 0;
                         return (
                           <div
                             key={idx}
-                            className={`border rounded-2xl p-4 transition-all duration-300 flex justify-between items-center ${
-                              qty > 0
+                            className={`border rounded-2xl p-4 transition-all duration-300 ${
+                              isChecked
                                 ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
                                 : 'bg-[#FBF4EC]/20 border-charcoal/10'
                             }`}
                           >
-                            <div className="flex items-start space-x-3 flex-1 pr-4">
+                            <div className="flex items-start space-x-3">
                               {/* Selection Tick Box */}
                               <div className="pt-0.5">
                                 <input
                                   type="checkbox"
                                   id={`tier-select-${idx}`}
-                                  checked={qty > 0}
+                                  checked={isChecked}
                                   onChange={(e) => {
                                     if (e.target.checked) {
-                                      setOrderQuantities((prev) => ({
+                                      setOrderTierItems((prev) => [
                                         ...prev,
-                                        [tier.name]: 1,
-                                      }));
+                                        {
+                                          id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                          tierName: tier.name,
+                                          forProfile: 'Myself',
+                                          quantity: 1,
+                                        },
+                                      ]);
                                     } else {
-                                      setOrderQuantities((prev) => ({
-                                        ...prev,
-                                        [tier.name]: 0,
-                                      }));
+                                      setOrderTierItems((prev) =>
+                                        prev.filter((item) => item.tierName !== tier.name),
+                                      );
                                     }
                                   }}
                                   className="rounded border-[#2B2118]/25 text-[#5C7A52] focus:ring-[#5C7A52]/40 w-4 h-4 cursor-pointer"
@@ -2363,38 +2448,89 @@ export default function CustomerHome({
                               </div>
                             </div>
 
-                            {/* Quantity Stepper */}
-                            <div
-                              className={`flex items-center space-x-2.5 bg-white border border-[#2B2118]/10 rounded-xl p-1 shrink-0 select-none shadow-sm transition-all duration-200 ${qty === 0 ? 'opacity-40' : 'opacity-100'}`}
-                            >
-                              <button
-                                type="button"
-                                disabled={qty === 0}
-                                onClick={() => updateQuantity(tier.name, -1)}
-                                className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                              >
-                                -
-                              </button>
-                              <span className="text-xs font-bold w-4 text-center text-charcoal">
-                                {qty}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (qty === 0) {
-                                    setOrderQuantities((prev) => ({
+                            {/* Sub-rows for per-profile assignment */}
+                            {isChecked && (
+                              <div className="mt-3 space-y-2 ml-2">
+                                {tierItems.map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="bg-[#FBF4EC]/40 rounded-lg px-3 py-2 flex items-center justify-between text-xs"
+                                  >
+                                    <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
+                                      <span className="text-charcoal/60 font-semibold">For:</span>
+                                      <select
+                                        value={item.forProfile}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setOrderTierItems((prev) =>
+                                            prev.map((oldItem) =>
+                                              oldItem.id === item.id
+                                                ? { ...oldItem, forProfile: val }
+                                                : oldItem,
+                                            ),
+                                          );
+                                        }}
+                                        className="bg-white/80 border border-[#2B2118]/10 rounded-xl px-2.5 py-1.5 text-xs text-charcoal font-semibold focus:border-[#5C7A52] focus:ring-2 focus:ring-[#5C7A52]/10 outline-none transition-all"
+                                      >
+                                        <option value="Myself">Myself ({customerName})</option>
+                                        {friendProfiles.map((f: any) => (
+                                          <option key={f._id} value={f.name}>
+                                            {f.name}
+                                          </option>
+                                        ))}
+                                      </select>
+
+                                      <span className="text-charcoal/60 font-semibold ml-1">Qty:</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity || 1}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value, 10);
+                                          setOrderTierItems((prev) =>
+                                            prev.map((oldItem) =>
+                                              oldItem.id === item.id
+                                                ? { ...oldItem, quantity: isNaN(val) ? 1 : Math.max(1, val) }
+                                                : oldItem,
+                                            ),
+                                          );
+                                        }}
+                                        className="w-16 bg-white/80 border border-[#2B2118]/10 rounded-xl px-2 py-1.5 text-xs text-charcoal font-semibold focus:border-[#5C7A52] focus:ring-2 focus:ring-[#5C7A52]/10 outline-none transition-all text-center"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOrderTierItems((prev) =>
+                                          prev.filter((oldItem) => oldItem.id !== item.id),
+                                        );
+                                      }}
+                                      className="w-5 h-5 rounded-full bg-[#E0653A]/10 hover:bg-[#E0653A]/20 text-[#E0653A] flex items-center justify-center transition-all text-xs font-bold"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOrderTierItems((prev) => [
                                       ...prev,
-                                      [tier.name]: 1,
-                                    }));
-                                  } else {
-                                    updateQuantity(tier.name, 1);
-                                  }
-                                }}
-                                className="w-7 h-7 rounded-lg hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold"
-                              >
-                                +
-                              </button>
-                            </div>
+                                      {
+                                        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                        tierName: tier.name,
+                                        forProfile: 'Myself',
+                                        quantity: 1,
+                                      },
+                                    ]);
+                                  }}
+                                  className="w-full py-1.5 border border-dashed border-[#5C7A52]/30 rounded-xl text-[10px] text-[#5C7A52] hover:bg-[#5C7A52]/5 font-bold uppercase tracking-wider transition-all duration-200"
+                                >
+                                  + Add another {tier.name}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })
@@ -2416,41 +2552,139 @@ export default function CustomerHome({
                         </label>
                         <div className="space-y-3.5">
                           {selectedVendor.addOns.map((ad, idx) => {
-                            const qty = orderQuantities[ad.name] || 0;
+                            const addOnItems = orderAddOnItems.filter((item) => item.addOnName === ad.name);
+                            const isChecked = addOnItems.length > 0;
                             return (
                               <div
                                 key={idx}
-                                className="flex justify-between items-center px-1"
+                                className={`border rounded-2xl p-4 transition-all duration-300 ${
+                                  isChecked
+                                    ? 'bg-[#5C7A52]/5 border-[#5C7A52]/25 shadow-sm'
+                                    : 'bg-[#FBF4EC]/20 border-charcoal/10'
+                                }`}
                               >
-                                <div className="text-left">
-                                  <p className="text-xs font-bold text-charcoal leading-none">
-                                    {ad.name}
-                                  </p>
-                                  <p className="text-[10px] text-[#5C7A52] font-extrabold mt-1">
-                                    +₹
-                                    {ad.price}
-                                  </p>
+                                <div className="flex justify-between items-center px-1">
+                                  <div className="flex items-center space-x-3 text-left">
+                                    <input
+                                      type="checkbox"
+                                      id={`addon-select-${idx}`}
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setOrderAddOnItems((prev) => [
+                                            ...prev,
+                                            {
+                                              id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                              addOnName: ad.name,
+                                              forProfile: 'Myself',
+                                              quantity: 1,
+                                            },
+                                          ]);
+                                        } else {
+                                          setOrderAddOnItems((prev) =>
+                                            prev.filter((item) => item.addOnName !== ad.name),
+                                          );
+                                        }
+                                      }}
+                                      className="rounded border-[#2B2118]/25 text-[#5C7A52] w-4 h-4 cursor-pointer"
+                                    />
+                                    <label
+                                      htmlFor={`addon-select-${idx}`}
+                                      className="cursor-pointer select-none"
+                                    >
+                                      <p className="text-xs font-bold text-charcoal leading-none">
+                                        {ad.name}
+                                      </p>
+                                      <p className="text-[10px] text-[#5C7A52] font-extrabold mt-1">
+                                        +₹{ad.price}
+                                      </p>
+                                    </label>
+                                  </div>
                                 </div>
-                                {/* Simple Stepper */}
-                                <div className="flex items-center space-x-2 bg-white border border-[#2B2118]/10 rounded-xl p-1 select-none shadow-sm">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateQuantity(ad.name, -1)}
-                                    className="w-6 h-6 rounded-md hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold text-xs"
-                                  >
-                                    -
-                                  </button>
-                                  <span className="text-xs font-bold w-4 text-center text-charcoal">
-                                    {qty}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateQuantity(ad.name, 1)}
-                                    className="w-6 h-6 rounded-md hover:bg-[#FBF4EC] flex items-center justify-center text-charcoal/60 active:scale-90 transition-transform font-extrabold text-xs"
-                                  >
-                                    +
-                                  </button>
-                                </div>
+
+                                {/* Sub-rows for per-profile assignment */}
+                                {isChecked && (
+                                  <div className="mt-3 space-y-2 ml-2">
+                                    {addOnItems.map((item) => (
+                                      <div
+                                        key={item.id}
+                                        className="bg-[#FBF4EC]/40 rounded-lg px-3 py-2 flex items-center justify-between text-xs"
+                                      >
+                                        <div className="flex items-center space-x-2 flex-wrap gap-y-1.5">
+                                          <span className="text-charcoal/60 font-semibold">For:</span>
+                                          <select
+                                            value={item.forProfile}
+                                            onChange={(e) => {
+                                              const val = e.target.value;
+                                              setOrderAddOnItems((prev) =>
+                                                prev.map((oldItem) =>
+                                                  oldItem.id === item.id
+                                                    ? { ...oldItem, forProfile: val }
+                                                    : oldItem,
+                                                ),
+                                              );
+                                            }}
+                                            className="bg-white/80 border border-[#2B2118]/10 rounded-xl px-2.5 py-1.5 text-xs text-charcoal font-semibold focus:border-[#5C7A52] focus:ring-2 focus:ring-[#5C7A52]/10 outline-none transition-all"
+                                          >
+                                            <option value="Myself">Myself ({customerName})</option>
+                                            {friendProfiles.map((f: any) => (
+                                              <option key={f._id} value={f.name}>
+                                                {f.name}
+                                              </option>
+                                            ))}
+                                          </select>
+
+                                          <span className="text-charcoal/60 font-semibold ml-1">Qty:</span>
+                                          <input
+                                            type="number"
+                                            min="1"
+                                            value={item.quantity || 1}
+                                            onChange={(e) => {
+                                              const val = parseInt(e.target.value, 10);
+                                              setOrderAddOnItems((prev) =>
+                                                prev.map((oldItem) =>
+                                                  oldItem.id === item.id
+                                                    ? { ...oldItem, quantity: isNaN(val) ? 1 : Math.max(1, val) }
+                                                    : oldItem,
+                                                ),
+                                              );
+                                            }}
+                                            className="w-16 bg-white/80 border border-[#2B2118]/10 rounded-xl px-2 py-1.5 text-xs text-charcoal font-semibold focus:border-[#5C7A52] focus:ring-2 focus:ring-[#5C7A52]/10 outline-none transition-all text-center"
+                                          />
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOrderAddOnItems((prev) =>
+                                              prev.filter((oldItem) => oldItem.id !== item.id),
+                                            );
+                                          }}
+                                          className="w-5 h-5 rounded-full bg-[#E0653A]/10 hover:bg-[#E0653A]/20 text-[#E0653A] flex items-center justify-center transition-all text-xs font-bold"
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOrderAddOnItems((prev) => [
+                                          ...prev,
+                                          {
+                                            id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                            addOnName: ad.name,
+                                            forProfile: 'Myself',
+                                            quantity: 1,
+                                          },
+                                        ]);
+                                      }}
+                                      className="w-full py-1.5 border border-dashed border-[#5C7A52]/30 rounded-xl text-[10px] text-[#5C7A52] hover:bg-[#5C7A52]/5 font-bold uppercase tracking-wider transition-all duration-200"
+                                    >
+                                      + Add another {ad.name}
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -2458,84 +2692,10 @@ export default function CustomerHome({
                       </div>
                     )}
 
-                  {/* Friend Profile & Payment Toggle */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-[#2B2118]/10 pt-4">
-                    {/* Friend Selector */}
-                    <div className="space-y-1.5 text-left">
-                      <label className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider flex justify-between items-center font-body">
-                        <span>Who is this for?</span>
-                        {selectedVendor &&
-                          selectedVendor.tiers.reduce(
-                            (acc, t) => acc + (orderQuantities[t.name] || 0),
-                            0,
-                          ) > 1 && (
-                            <span className="text-[9px] text-[#5C7A52] lowercase font-semibold tracking-normal">
-                              (select up to{' '}
-                              {selectedVendor.tiers.reduce(
-                                (acc, t) =>
-                                  acc + (orderQuantities[t.name] || 0),
-                                0,
-                              )}
-                              )
-                            </span>
-                          )}
-                      </label>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {[
-                          'Myself',
-                          ...friendProfiles.map((f: any) => f.name),
-                        ].map((name: string) => {
-                          const isSelected = selectedFriends.includes(name);
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              onClick={() => {
-                                const totalTiffins = selectedVendor
-                                  ? selectedVendor.tiers.reduce(
-                                      (acc, t) =>
-                                        acc + (orderQuantities[t.name] || 0),
-                                      0,
-                                    )
-                                  : 0;
-                                if (totalTiffins <= 1) {
-                                  setSelectedFriends([name]);
-                                } else {
-                                  if (isSelected) {
-                                    if (selectedFriends.length > 1) {
-                                      setSelectedFriends(
-                                        selectedFriends.filter(
-                                          (n) => n !== name,
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    if (selectedFriends.length < totalTiffins) {
-                                      setSelectedFriends([
-                                        ...selectedFriends,
-                                        name,
-                                      ]);
-                                    }
-                                  }
-                                }
-                              }}
-                              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${
-                                isSelected
-                                  ? 'bg-[#5C7A52] text-white border-[#5C7A52] shadow-sm'
-                                  : 'bg-[#FBF4EC]/50 text-charcoal/70 border-charcoal/15 hover:border-[#5C7A52]/50 hover:bg-[#FBF4EC]'
-                              }`}
-                            >
-                              {name === 'Myself'
-                                ? `Myself (${customerName})`
-                                : name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
+                  {/* Payment Toggle */}
+                  <div className="border-t border-[#2B2118]/10 pt-4">
                     {/* Payment Method Selector */}
-                    <div className="space-y-1.5 text-left">
+                    <div className="space-y-1.5 text-left max-w-xs">
                       <label className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider block font-body">
                         Billing Mode
                       </label>
@@ -2586,6 +2746,54 @@ export default function CustomerHome({
                             Token
                           </button>
                         )}
+                        {(() => {
+                          const selectedVendorConnection = connections.find(
+                            (c) =>
+                              (typeof c.vendorId === 'object' && c.vendorId !== null ? c.vendorId._id : c.vendorId)?.toString() ===
+                              selectedVendor?.id?.toString()
+                          );
+                          const isConnectionEstablished = selectedVendorConnection?.status === 'accepted';
+                          
+                          if (isConnectionEstablished) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentMethod('payLater')}
+                                className={`flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all duration-300 ${
+                                  paymentMethod === 'payLater'
+                                    ? 'bg-[#5C7A52] text-white shadow-sm'
+                                    : 'text-charcoal/50 hover:text-charcoal/80'
+                                }`}
+                              >
+                                Pay Later
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                type="button"
+                                disabled={true}
+                                title="no connection established yet"
+                                className="flex-1 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider rounded-xl text-charcoal/30 cursor-not-allowed flex items-center justify-center gap-1"
+                              >
+                                <svg
+                                  className="w-2.5 h-2.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                  />
+                                </svg>
+                                Pay Later
+                              </button>
+                            );
+                          }
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -2622,7 +2830,7 @@ export default function CustomerHome({
                     </div>
                     <button
                       type="submit"
-                      disabled={orderSubmitting || calculateOrderTotal() === 0}
+                      disabled={orderSubmitting || orderTierItems.length === 0}
                       className="flex-1 py-4 rounded-2xl bg-[#5C7A52] hover:bg-[#5C7A52]/90 text-white font-bold text-sm shadow-[0_8px_25px_rgba(92,122,82,0.25)] transition-all flex items-center justify-center space-x-2 select-none disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {orderSubmitting ? (

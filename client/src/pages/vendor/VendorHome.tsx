@@ -35,14 +35,16 @@ export interface MenuData {
 // Backend-shaped order from GET /api/orders/:vendorId
 export interface OrderTier {
   tierName: string;
-  quantity: number;
   pricePerUnit: number;
+  forProfile: string;
+  quantity?: number;
 }
 
 export interface OrderAddOn {
   addOnName: string;
-  quantity: number;
   pricePerUnit: number;
+  forProfile: string;
+  quantity?: number;
 }
 
 export interface Order {
@@ -1843,8 +1845,8 @@ export default function VendorHome({
                     badgeText = '✕ Rejected';
                   }
 
-                  const totalTiffins = order.tiers.reduce((sum, t) => sum + t.quantity, 0);
-                  const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * a.quantity, 0) : 0;
+                  const totalTiffins = order.tiers.reduce((sum, t) => sum + (t.quantity || 1), 0);
+                  const addOnsTotal = order.addOns ? order.addOns.reduce((sum, a) => sum + a.pricePerUnit * (a.quantity || 1), 0) : 0;
 
                   return (
                     <div
@@ -1892,30 +1894,40 @@ export default function VendorHome({
                             {badgeText}
                           </span>
                           {order.addOns &&
-                            order.addOns.map((a, idx) => (
+                            Object.entries(
+                              order.addOns.reduce((acc, a) => {
+                                acc[a.addOnName] = (acc[a.addOnName] || 0) + (a.quantity || 1);
+                                return acc;
+                              }, {} as Record<string, number>)
+                            ).map(([addOnName, qty], idx) => (
                               <span
                                 key={`ao-${idx}`}
                                 className="px-3 py-1 rounded-md bg-white border border-charcoal/5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-charcoal/80 font-bold text-[10px] flex items-center gap-1.5"
                               >
                                 <span className="text-charcoal/40">
-                                  {a.quantity}x
+                                  {qty}x
                                 </span>
-                                {a.addOnName}
+                                {addOnName}
                               </span>
                             ))}
                         </div>
 
                         <div className="flex flex-col gap-1 mt-0.5">
-                          {order.tiers.map((t, idx) => (
+                          {Object.entries(
+                            order.tiers.reduce((acc, t) => {
+                              acc[t.tierName] = (acc[t.tierName] || 0) + (t.quantity || 1);
+                              return acc;
+                            }, {} as Record<string, number>)
+                          ).map(([tierName, qty], idx) => (
                             <div
                               key={idx}
                               className="flex items-baseline gap-2"
                             >
                               <span className="text-[#e07a5f]/80 font-bold text-xs">
-                                {t.quantity}x
+                                {qty}x
                               </span>
                               <span className="font-display font-black text-charcoal text-[22px] tracking-tight leading-none">
-                                {t.tierName}
+                                {tierName}
                               </span>
                             </div>
                           ))}

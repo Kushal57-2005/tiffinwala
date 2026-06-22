@@ -92,3 +92,4 @@ export const getVendorConnections = asyncHandler(
       .json(new ApiResponse(200, result, 'Vendor connections fetched'));
   },
 );
+

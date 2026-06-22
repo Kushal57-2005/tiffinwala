@@ -13,6 +13,7 @@ import {
   removeFriendProfile,
   getVendorPublicDetails,
   getOrderForCustomer,
+  customerDashboard,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
 import { getSubscriptionsPlansForCustomers } from '../controllers/subscription.contoller';
@@ -95,3 +96,10 @@ router.get(
   getSubscriptionsPlansForCustomers,
 );
 export default router;
+
+router.get(
+  '/dashboard',
+  authMiddleware,
+  requireRole('customer'),
+  customerDashboard,
+);

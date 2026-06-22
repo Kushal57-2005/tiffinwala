@@ -6,6 +6,7 @@ import {
   getVendorProfile,
   toggleVendorOpen,
   updateVendorProfile,
+  vendorDashboard,
 } from '../controllers/vendor.contoller';
 import { requireRole } from '../middlewares/role.middleware';
 import { authMiddleware } from '../middlewares/auth.middleware';
@@ -56,6 +57,13 @@ router.get(
   authMiddleware,
   requireRole('vendor'),
   getSubscribersPlans,
+);
+
+router.get(
+  '/dashboard',
+  authMiddleware,
+  requireRole('vendor'),
+  vendorDashboard,
 );
 
 export default router;

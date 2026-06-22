@@ -8,7 +8,9 @@ const connectDB = async () => {
             throw new Error('MONGO_URL is not defined');
         }
 
-        await mongoose.connect(mongoURI);
+        await mongoose.connect(mongoURI, {
+            serverSelectionTimeoutMS: 5000,
+        });
 
         console.log('✅ mongoDB connected successfully.');
     } catch (error) {

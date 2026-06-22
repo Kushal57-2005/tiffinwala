@@ -16,6 +16,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'https://tiffinwala-kkw.vercel.app',
+  'https://tiffinwala-production.up.railway.app',
 ];
 
 app.use(

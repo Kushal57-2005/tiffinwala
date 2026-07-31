@@ -499,6 +499,7 @@ export default function VendorHome({
   const [isOpen, setIsOpen] = useState(initialIsOpen);
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [platformFee, setPlatformFee] = useState<number>(0);
   const [profileLoading, setProfileLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<'Lunch' | 'Dinner'>(
     () => {
@@ -608,6 +609,7 @@ export default function VendorHome({
           setBusinessName(profile.businessName || 'Annapurna Rasoi');
           setIsOpen(profile.isOpen);
           setWalletBalance(profile.walletBalance || 0);
+          setPlatformFee(profile.platformBalance || 0);
           // Capture vendorId (Vendor document _id)
           const vid = profile._id as string;
 
@@ -1167,6 +1169,7 @@ export default function VendorHome({
           role="vendor"
           passedName={businessName}
           passedWalletBalance={walletBalance}
+          passedPlatformFee={platformFee}
           onProfileClick={() => setShowProfileModal(true)}
         />
 

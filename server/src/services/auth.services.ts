@@ -190,7 +190,7 @@ export const loginCustomerService = async (
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
         throw new ApiError(401, 'Invalid credentials');
-    }
+    }   
 
     const token = generateToken(user._id.toString(), user.role);
 

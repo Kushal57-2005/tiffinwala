@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 
 export interface ConnectionVendor {
@@ -25,6 +26,7 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
   onPayDue,
   isPaying = false,
 }) => {
+  const navigate = useNavigate();
   const { _id, vendorId, status, pendingDue } = connection;
   const businessName = vendorId?.businessName || 'Unknown Vendor';
   const isAccepted = status === 'accepted';
@@ -73,47 +75,33 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
       </div>
 
       {isAccepted && (
-        <div className="mt-6">
+        <div className="mt-6 flex gap-3">
           <button
-            onClick={handlePay}
-            disabled={!hasDue || isPaying}
-            className={`w-full py-3.5 px-4 rounded-2xl font-display font-bold text-xs uppercase tracking-wider border transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
-              hasDue
-                ? isPaying
+            onClick={() => navigate(`/customer/chat/${vendorId?._id}`, { state: { businessName } })}
+            className="flex-1 py-3.5 px-4 rounded-2xl font-display font-bold text-xs uppercase tracking-wider border border-leaf/35 text-leaf hover:bg-leaf hover:text-white transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Chat
+          </button>
+          {hasDue ? (
+            <button
+              onClick={handlePay}
+              disabled={isPaying}
+              className={`flex-1 py-3.5 px-4 rounded-2xl font-display font-bold text-xs uppercase tracking-wider border transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+                isPaying
                   ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 cursor-wait'
                   : 'bg-leaf text-white border-leaf hover:bg-[#4C6643] hover:border-[#4C6643] shadow-[0_4px_12px_rgba(92,122,82,0.2)] hover:shadow-[0_6px_20px_rgba(92,122,82,0.3)] active:scale-98'
-                : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            {isPaying ? (
-              <>
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-amber-700"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Processing...
-              </>
-            ) : hasDue ? (
-              'Pay Due Amount'
-            ) : (
-              'No Dues Pending'
-            )}
-          </button>
+              }`}
+            >
+              {isPaying ? 'Processing...' : 'Pay Due'}
+            </button>
+          ) : (
+            <div className="flex-1 py-3.5 px-4 rounded-2xl font-display font-bold text-xs uppercase tracking-wider border border-[#2B2118]/10 bg-gray-50 text-gray-400 flex items-center justify-center select-none">
+              No Dues
+            </div>
+          )}
         </div>
       )}
     </div>

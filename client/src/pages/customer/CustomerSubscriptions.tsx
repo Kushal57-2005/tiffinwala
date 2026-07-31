@@ -550,9 +550,21 @@ export const CustomerSubscriptions: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-up">
-            {subscriptions.map((sub) => {
-              const vendorName = sub.vendorId?.businessName || 'Unknown Vendor';
-              const remaining = sub.remainingTokens;
+            {[...subscriptions]
+              .sort((a, b) => {
+                const getStatusScore = (sub: ISubscription) => {
+                  const expDate = new Date(sub.expiryDate);
+                  const isExpired = sub.status === 'expired' || expDate < new Date();
+                  const isExhausted = sub.status === 'exhausted' || sub.remainingTokens <= 0;
+                  if (!isExpired && !isExhausted) return 1; // Active
+                  if (isExpired) return 2; // Expired
+                  return 3; // Exhausted
+                };
+                return getStatusScore(a) - getStatusScore(b);
+              })
+              .map((sub) => {
+                const vendorName = sub.vendorId?.businessName || 'Unknown Vendor';
+                const remaining = sub.remainingTokens;
               const total = sub.totalTokens;
               const percentage = Math.max(
                 0,

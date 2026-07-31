@@ -6,6 +6,7 @@ import {
   toggleVendorOpenService,
   updateVendorProfileService,
   vendorDashboardService,
+  vendorHistoryService,
 } from '../services/vendor.services';
 import { asyncHandler } from '../utils/async-handler';
 import { ApiError } from '../utils/api-error';
@@ -166,5 +167,16 @@ export const vendorDashboard = asyncHandler(
     return res
       .status(200)
       .json(new ApiResponse(200, result, 'Vendor dashboard Fetched'));
+  },
+);
+
+export const vendorHistory = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId as string;
+    const result = await vendorHistoryService(userId);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, 'Order history is fetch'));
   },
 );

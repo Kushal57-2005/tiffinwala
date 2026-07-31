@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
+import { socket } from '../utils/socket';
 
 interface INotification {
   _id: string;
@@ -17,6 +18,7 @@ interface DashboardHeaderProps {
   subpageTitle?: string;
   passedWalletBalance?: number;
   passedName?: string;
+  passedPlatformFee?: number;
   onAddMoneyClick?: () => void;
   onProfileClick?: () => void;
 }
@@ -26,6 +28,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   subpageTitle,
   passedWalletBalance,
   passedName,
+  passedPlatformFee,
   onAddMoneyClick,
   onProfileClick,
 }) => {
@@ -36,6 +39,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   // Local States for Fallback/Internal Fetching
   const [internalWalletBalance, setInternalWalletBalance] = useState<number>(0);
+  const [internalPlatformFee, setInternalPlatformFee] = useState<number>(0);
+  const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
   const [internalName, setInternalName] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -63,14 +68,18 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   const homePath = isCustomer ? '/customer/home' : '/vendor/home';
   const subPath = isCustomer ? '/customer/subscriptions' : '/vendor/subscriptions';
   const connPath = isCustomer ? '/customer/connections' : '/vendor/connections';
+  const chatPath = isCustomer ? '/customer/chat' : '/vendor/chat';
   const ratingsPath = '/vendor/ratings';
+  const historyPath = isCustomer ? '/customer/history' : '/vendor/history';
 
   const currentPath = location.pathname;
   const isHomeActive = currentPath.endsWith('/home');
   const isSubActive = currentPath.endsWith('/subscriptions');
   const isConnActive = currentPath.endsWith('/connections');
+  const isChatActive = currentPath.includes('/chat');
   const isRatingsActive = currentPath.endsWith('/ratings');
   const isDashActive = currentPath.endsWith('/dashboard');
+  const isHistoryActive = currentPath.endsWith('/history');
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -148,7 +157,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     );
 
     const fetchFallbackData = async () => {
-      if (passedWalletBalance !== undefined && passedName !== undefined) {
+      const needsPlatformFee = !isCustomer && passedPlatformFee === undefined;
+      if (passedWalletBalance !== undefined && passedName !== undefined && !needsPlatformFee) {
         return;
       }
       try {
@@ -164,6 +174,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             setInternalName(fullName);
           } else {
             setInternalName(profile.businessName || 'Annapurna Rasoi');
+            setInternalPlatformFee(profile.platformBalance || 0);
           }
           setInternalWalletBalance(profile.walletBalance || 0);
         }
@@ -176,7 +187,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
     fetchFallbackData();
     fetchNotifications();
-  }, [passedWalletBalance, passedName, role, fetchNotifications]);
+  }, [passedWalletBalance, passedName, passedPlatformFee, role, fetchNotifications]);
 
   // Poll for notifications every 60s while panel is closed
   useEffect(() => {
@@ -187,6 +198,23 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     }, 60000);
     return () => clearInterval(interval);
   }, [showNotifications, fetchNotifications]);
+
+  // Listen for real-time notifications via Socket.io
+  useEffect(() => {
+    const handleNewNotification = (newNotif: INotification) => {
+      console.log('[Socket] Received new notification in real-time:', newNotif);
+      setNotifications((prev) => {
+        if (prev.some((n) => n._id === newNotif._id)) return prev;
+        return [newNotif, ...prev];
+      });
+    };
+
+    socket.on('newNotification', handleNewNotification);
+
+    return () => {
+      socket.off('newNotification', handleNewNotification);
+    };
+  }, []);
 
   // Refresh on open
   useEffect(() => {
@@ -210,6 +238,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
   const currentWalletBalance = passedWalletBalance !== undefined ? passedWalletBalance : internalWalletBalance;
   const currentName = passedName !== undefined ? passedName : internalName;
+  const currentPlatformFee = passedPlatformFee !== undefined ? passedPlatformFee : internalPlatformFee;
 
   const getInitials = (name: string) => {
     return name
@@ -291,7 +320,8 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   };
 
   return (
-    <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.12)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+    <>
+      <header className="relative z-30 bg-white/40 border border-white/30 backdrop-blur-xl rounded-[32px] p-5 md:p-6 shadow-[0_24px_70px_-15px_rgba(43,33,24,0.12)] mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
       {loading && passedWalletBalance === undefined && passedName === undefined ? (
         <div className="flex items-center space-x-4 animate-pulse w-full sm:w-auto">
           <div className="w-14 h-14 rounded-2xl bg-charcoal/10 shrink-0" />
@@ -302,7 +332,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex items-center space-x-4 w-full sm:w-auto">
+        <div className="flex items-center space-x-4 w-full sm:w-auto min-w-0">
           {/* Interactive Avatar / Initials badge */}
           <button
             onClick={handleAvatarClick}
@@ -313,7 +343,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
               {currentName ? getInitials(currentName) : (isCustomer ? 'C' : 'V')}
             </span>
           </button>
-          <div className="text-center sm:text-left">
+          <div className="text-center sm:text-left min-w-0">
             <p className="text-[10px] text-[#2B2118]/50 font-bold uppercase tracking-wider font-body">
               {subpageTitle ? `Dashboard • ${subpageTitle}` : greeting}
             </p>
@@ -327,7 +357,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       )}
 
-      <div className="flex flex-row items-center justify-center sm:justify-end gap-3 mt-4 sm:mt-0 w-full sm:w-auto">
+      <div className="flex flex-row items-center justify-center sm:justify-end gap-3 mt-4 sm:mt-0 w-full sm:w-auto shrink-0">
         {/* Desktop Navigation Menu (hidden on mobile, visible on larger screens) */}
         <div className="hidden md:flex items-center gap-3 mr-2">
           {/* Home Button */}
@@ -382,6 +412,32 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </svg>
           </button>
 
+          {/* Messages Button */}
+          <button
+            onClick={() => navigate(chatPath)}
+            className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+              isChatActive ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+            }`}
+            title="Messages"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </button>
+
+          {/* History Button */}
+          <button
+            onClick={() => navigate(historyPath)}
+            className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+              isHistoryActive ? activeBg : 'bg-white/70 text-charcoal/80 ' + hoverBg
+            }`}
+            title="Order History"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
           {/* Ratings Button - Vendor Only */}
           {!isCustomer && (
             <button
@@ -429,19 +485,23 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
 
         {/* Vendor Wallet Balance */}
         {!isCustomer && (
-          <div className={`${themeBgAccentClass} border ${themeBorderAccentClass} rounded-2xl px-4 py-2.5 flex items-center gap-2 select-none shadow-sm bg-white/30 shrink-0`}>
+          <button
+            onClick={() => setShowWalletModal(true)}
+            className={`${themeBgAccentClass} border ${themeBorderAccentClass} rounded-2xl px-4 py-2.5 flex items-center gap-2 select-none shadow-sm bg-white/30 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 focus:outline-none`}
+            title="View Wallet & Platform Fee Details"
+          >
             <svg className={`w-4 h-4 ${themeTextAccentClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <div className="text-left font-body">
               <p className="text-[9px] uppercase tracking-wider font-bold text-[#2B2118]/40 leading-none">
-                Wallet Balance
+                Total Balance
               </p>
               <p className={`text-sm font-extrabold ${themeTextAccentClass} leading-none mt-1`}>
-                ₹{currentWalletBalance.toFixed(2)}
+                ₹{(currentWalletBalance + currentPlatformFee).toFixed(2)}
               </p>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Notification Bell */}
@@ -618,5 +678,96 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </button>
       </div>
     </header>
+
+      {/* Vendor Wallet Details Modal */}
+      {showWalletModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-fade-in"
+          onClick={() => setShowWalletModal(false)}
+        >
+          <div
+            className="bg-white/95 border border-white/30 shadow-[0_24px_70px_rgba(43,33,24,0.3)] rounded-[32px] w-full max-w-md max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-br from-[#1F1710] to-[#2E2218] p-6 text-cream relative select-none shrink-0">
+              <div className="relative z-10 flex justify-between items-center">
+                <div className="text-left">
+                  <h3 className="font-display text-xl md:text-2xl font-bold text-white">
+                    Wallet Details
+                  </h3>
+                  <p className="text-xs text-white/60 mt-1">
+                    Your current balance and platform fee metrics.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowWalletModal(false)}
+                  className="text-white/70 hover:text-white transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4 bg-[#FBF4EC]/50 font-body text-[#2B2118] overflow-y-auto">
+              {/* Total Balance Highlight */}
+              <div className="bg-white border border-[#E0653A]/20 rounded-2xl p-4 shadow-sm text-center relative overflow-hidden">
+                <div className="absolute -right-3 -top-3 w-12 h-12 rounded-full bg-[#E0653A]/5" />
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#2B2118]/40 block">
+                  Total Balance
+                </span>
+                <span className="text-2xl md:text-3xl font-display font-extrabold text-[#E0653A] mt-1 block">
+                  ₹{(currentWalletBalance + currentPlatformFee).toFixed(2)}
+                </span>
+              </div>
+
+              {/* Wallet & Fee Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white border border-[#2B2118]/10 rounded-2xl p-4 shadow-sm text-center">
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-[#2B2118]/40 block">
+                    Wallet Balance
+                  </span>
+                  <span className="text-lg md:text-xl font-display font-extrabold text-[#2B2118]/80 mt-1 block">
+                    ₹{currentWalletBalance.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-white border border-[#2B2118]/10 rounded-2xl p-4 shadow-sm text-center">
+                  <span className="text-[10px] uppercase font-bold tracking-widest text-[#2B2118]/40 block">
+                    Platform Fee
+                  </span>
+                  <span className="text-lg md:text-xl font-display font-extrabold text-[#2B2118]/70 mt-1 block">
+                    ₹{currentPlatformFee.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Policy Statement Box */}
+              <div className="bg-[#E0653A]/10 border border-[#E0653A]/20 rounded-2xl p-4 flex gap-3 items-start">
+                <svg className="w-5 h-5 text-[#E0653A] shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="text-xs md:text-sm font-semibold text-[#2B2118]/80 leading-relaxed text-left">
+                  10% of your each order goes into the platform fee which deducted monthly from 10% percent of your revenue is ours
+                </div>
+              </div>
+
+              {/* Close Action */}
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setShowWalletModal(false)}
+                  className="w-full py-3 rounded-xl bg-[#E0653A] hover:bg-[#c2512a] text-white font-display font-bold text-xs uppercase tracking-wider shadow-[0_4px_12px_rgba(224,101,58,0.2)] transition-all duration-200 hover:scale-102 active:scale-98 cursor-pointer text-center"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };

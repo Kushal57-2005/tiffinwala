@@ -11,6 +11,8 @@ export interface ISubscription extends Document {
   purchaseDate: Date;
   expiryDate: Date;
   status: 'active' | 'expired' | 'exhausted';
+  expiryWarningSent: boolean;
+  tokenWarningSent: boolean;
 }
 
 const SubscriptionSchema = new Schema<ISubscription>(
@@ -59,6 +61,8 @@ const SubscriptionSchema = new Schema<ISubscription>(
       enum: ['active', 'expired', 'exhausted'],
       default: 'active',
     },
+    expiryWarningSent: { type: Boolean, default: false },
+    tokenWarningSent: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

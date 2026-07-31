@@ -3,6 +3,7 @@ import mongoose, { Schema } from 'mongoose';
 export interface IMessage {
   customerId: mongoose.Types.ObjectId;
   vendorId: mongoose.Types.ObjectId;
+  senderId: mongoose.Types.ObjectId;
   senderRole: 'customer' | 'vendor';
   text: string;
   isRead: boolean;
@@ -21,6 +22,11 @@ const MessageSchema = new Schema<IMessage>(
     vendorId: {
       type: Schema.Types.ObjectId,
       ref: 'Vendor',
+      required: true,
+    },
+    senderId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       required: true,
     },
     senderRole: {
@@ -45,7 +51,7 @@ const MessageSchema = new Schema<IMessage>(
     },
     createdAt: {
       type: Date,
-      required: true,
+      default: Date.now,
     },
   },
   { timestamps: true },

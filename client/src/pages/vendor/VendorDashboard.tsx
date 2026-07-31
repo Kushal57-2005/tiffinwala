@@ -111,6 +111,7 @@ export const VendorDashboard: React.FC = () => {
   const [data, setData] = useState<VendorDashboardData | null>(null);
   const [businessName, setBusinessName] = useState<string>('');
   const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [platformFee, setPlatformFee] = useState<number>(0);
 
   // Simulation configurations for review/debugging
   const [simulateEmpty, setSimulateEmpty] = useState<boolean>(false);
@@ -149,6 +150,7 @@ export const VendorDashboard: React.FC = () => {
           const profile = res.data.data;
           setBusinessName(profile.businessName || 'Annapurna Rasoi');
           setWalletBalance(profile.walletBalance || 0);
+          setPlatformFee(profile.platformBalance || 0);
         }
       } catch (err) {
         console.error('Error loading vendor profile on dashboard:', err);
@@ -363,6 +365,7 @@ export const VendorDashboard: React.FC = () => {
           subpageTitle="Business Overview"
           passedWalletBalance={walletBalance}
           passedName={businessName}
+          passedPlatformFee={platformFee}
         />
 
         {/* Mobile Sub-Navbar */}

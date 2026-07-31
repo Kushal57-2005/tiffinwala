@@ -414,7 +414,7 @@ interface IUser {
   phone: string;
   email: string;
   passwordHash: string;
-  role: "customer" | "vendor";
+  role: 'customer' | 'vendor';
   isPhoneVerified: boolean;
   isEmailVerified: boolean;
   createdAt: Date;
@@ -450,9 +450,9 @@ interface IVendor extends IUser {
 interface IMenuItem {
   _id: ObjectId;
   vendorId: ObjectId;
-  session: "lunch" | "dinner";
+  session: 'lunch' | 'dinner';
   description: string;
-  type: "tiffin" | "parcel";
+  type: 'tiffin' | 'parcel';
   price: number;
   maxQuantity: number;
   remainingQuantity: number;
@@ -469,10 +469,10 @@ interface IOrder {
   profiles: { profileId: ObjectId; quantity: number }[];
   totalQuantity: number;
   totalAmount: number;
-  paymentMethod: "wallet" | "token" | "monthly"; // "monthly" = added to pendingDue
+  paymentMethod: 'wallet' | 'token' | 'monthly'; // "monthly" = added to pendingDue
   isSettled: boolean; // true once paid (immediately for wallet/token, later for monthly)
   note?: string;
-  status: "pending" | "accepted" | "rejected" | "delivered" | "received";
+  status: 'pending' | 'accepted' | 'rejected' | 'delivered' | 'received';
   customerLocation: { lat: number; lng: number };
   createdAt: Date;
 }
@@ -482,7 +482,7 @@ interface IConnection {
   _id: ObjectId;
   customerId: ObjectId;
   vendorId: ObjectId;
-  status: "pending" | "accepted" | "rejected";
+  status: 'pending' | 'accepted' | 'rejected';
   pendingDue: number; // accumulated unpaid "Add to Monthly Bill" orders
   createdAt: Date;
 }
@@ -506,9 +506,9 @@ interface IMessage {
   senderId: ObjectId;
   receiverId: ObjectId;
   customerId: ObjectId; // the customer side of this chat pair
-  vendorId: ObjectId;   // the vendor side of this chat pair
+  vendorId: ObjectId; // the vendor side of this chat pair
   text: string;
-  complaintStatus?: "raised" | "acknowledged" | "resolved";
+  complaintStatus?: 'raised' | 'acknowledged' | 'resolved';
   isComplaint: boolean;
   createdAt: Date;
 }
@@ -537,7 +537,7 @@ interface INotification {
 interface IMonthlyBill {
   _id: ObjectId;
   userId: ObjectId;
-  role: "customer" | "vendor";
+  role: 'customer' | 'vendor';
   month: number;
   year: number;
   data: object; // full bill JSON

@@ -94,7 +94,8 @@ export const placeOrderService = async (input: PlaceOrderInput) => {
     (sum, a) => sum + a.pricePerUnit * a.quantity,
     0,
   );
-  const totalAmount = tiersTotal + addOnsTotal;
+  const totalAmount =
+    paymentMethod === 'token' ? addOnsTotal : tiersTotal + addOnsTotal;
   const connection = await Connection.findOne({
     customerId: customer._id,
     vendorId: vendor._id,
@@ -115,15 +116,19 @@ export const placeOrderService = async (input: PlaceOrderInput) => {
   }
 
   if (paymentMethod === 'token') {
+    const totalTiffins = tiers.reduce((sum, t) => sum + (t.quantity || 1), 0);
     const token = await Subscription.findOne({
       customerId: customer._id,
       vendorId: vendor._id,
+      status: 'active',
+      remainingTokens: { $gte: totalTiffins },
       expiryDate: { $gte: today },
     });
     if (!token) throw new ApiError(404, 'Token are not valid or not found');
 
-    const totalTiffins = tiers.reduce((sum, t) => sum + (t.quantity || 1), 0);
     if (token.remainingTokens < totalTiffins) {
+      token.status = 'exhausted';
+      token.save();
       throw new ApiError(
         400,
         `Insufficient Tokens. Required: ${totalTiffins}, Available: ${token.remainingTokens}`,
@@ -311,17 +316,19 @@ export const acceptOrderService = async (orderId: string) => {
 
     if (order.paymentMethod === 'token') {
       const today = getTodayUTC();
-      const token = await Subscription.findOne({
-        customerId: customer._id,
-        vendorId: vendor._id,
-        expiryDate: { $gte: today },
-      }).session(session);
-      if (!token) throw new ApiError(404, 'Token are not valid or not found');
-
       const totalTiffins = order.tiers.reduce(
         (sum, t) => sum + (t.quantity || 1),
         0,
       );
+      const token = await Subscription.findOne({
+        customerId: customer._id,
+        vendorId: vendor._id,
+        status: 'active',
+        remainingTokens: { $gte: totalTiffins },
+        expiryDate: { $gte: today },
+      }).session(session);
+      if (!token) throw new ApiError(404, 'Token are not valid or not found');
+
       if (token.remainingTokens < totalTiffins) {
         throw new ApiError(
           400,
@@ -329,6 +336,9 @@ export const acceptOrderService = async (orderId: string) => {
         );
       }
       token.remainingTokens -= totalTiffins;
+      if (token.remainingTokens === 0) {
+        token.status = 'exhausted';
+      }
       console.log(`Token Deducted remaining Token ${token.remainingTokens}`);
       await token.save({ session });
 
@@ -474,8 +484,16 @@ export const receivedOrderService = async (orderId: string) => {
     if (!vendor) throw new ApiError(404, 'Vendor not found');
 
     if (order.paymentMethod === 'wallet') {
-      vendor.walletBalance += order.totalAmount;
-      await vendor.save({ session });
+      if (vendor.isPlatformDebtFlagged === true) {
+        const platformFee = Math.round(order.totalAmount * 0.1);
+        const vendorShare = order.totalAmount - platformFee;
+        vendor.platformBalance += platformFee;
+        vendor.walletBalance += vendorShare;
+        await vendor.save({ session });
+      } else {
+        vendor.walletBalance += order.totalAmount;
+        await vendor.save({ session });
+      }
     }
 
     if (order.paymentMethod === 'token') {
@@ -484,8 +502,16 @@ export const receivedOrderService = async (orderId: string) => {
         0,
       );
       if (addOnsTotal > 0) {
-        vendor.walletBalance += addOnsTotal;
-        await vendor.save({ session });
+        if (vendor.isPlatformDebtFlagged === true) {
+          const platformFee = Math.round(addOnsTotal * 0.1);
+          const vendorShare = addOnsTotal - platformFee;
+          vendor.platformBalance += platformFee;
+          vendor.walletBalance += vendorShare;
+          await vendor.save({ session });
+        } else {
+          vendor.walletBalance += addOnsTotal;
+          await vendor.save({ session });
+        }
       }
     }
 

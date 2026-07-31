@@ -76,33 +76,77 @@ export const buyPlansService = async (
     if (!vendor) throw new ApiError(404, 'Vendor not found');
 
     customer.walletBalance -= subscriptionPlan.price;
-    vendor.walletBalance += subscriptionPlan.price;
+    if (vendor.isPlatformDebtFlagged === true) {
+      const platformFee = Math.round(subscriptionPlan.price * 0.1);
+      const vendorShare = subscriptionPlan.price - platformFee;
+      vendor.walletBalance += vendorShare;
+      vendor.platformBalance += platformFee;
+    } else {
+      vendor.walletBalance += subscriptionPlan.price;
+    }
 
     await customer.save({ session });
     await vendor.save({ session });
 
     const today = getTodayUTC();
 
-    const expiryDate = new Date(today);
-    expiryDate.setDate(today.getDate() + subscriptionPlan.totalTokens * 2);
+    // Check for an existing active subscription for this customer and vendor
+    const existingSubscription = await Subscription.findOne({
+      customerId: customer._id,
+      vendorId: subscriptionPlan.vendorId,
+      status: 'active',
+      expiryDate: { $gte: today },
+    }).session(session);
 
-    const subscription = await Subscription.create(
-      [
-        {
-          customerId: customer._id,
-          vendorId: subscriptionPlan.vendorId,
-          planId: subscriptionPlan._id,
-          planName: subscriptionPlan.name,
-          totalTokens: subscriptionPlan.totalTokens,
-          remainingTokens: subscriptionPlan.totalTokens,
-          pricePaid: subscriptionPlan.price,
-          purchaseDate: today,
-          expiryDate,
-          status: 'active',
-        },
-      ],
-      { session },
-    );
+    let subscriptionDoc;
+
+    if (existingSubscription) {
+      existingSubscription.planId = subscriptionPlan._id;
+      existingSubscription.planName = subscriptionPlan.name;
+      existingSubscription.totalTokens += subscriptionPlan.totalTokens;
+      existingSubscription.remainingTokens += subscriptionPlan.totalTokens;
+      existingSubscription.pricePaid += subscriptionPlan.price;
+      existingSubscription.purchaseDate = today;
+
+      // Extend expiry date: if current expiry is in the future, extend from it. Otherwise, extend from today.
+      const baseDate =
+        existingSubscription.expiryDate > today
+          ? existingSubscription.expiryDate
+          : today;
+      const newExpiryDate = new Date(baseDate);
+      newExpiryDate.setDate(
+        newExpiryDate.getDate() + subscriptionPlan.totalTokens * 2,
+      );
+      existingSubscription.expiryDate = newExpiryDate;
+
+      existingSubscription.expiryWarningSent = false;
+      existingSubscription.tokenWarningSent = false;
+
+      await existingSubscription.save({ session });
+      subscriptionDoc = existingSubscription;
+    } else {
+      const expiryDate = new Date(today);
+      expiryDate.setDate(today.getDate() + subscriptionPlan.totalTokens * 2);
+
+      const created = await Subscription.create(
+        [
+          {
+            customerId: customer._id,
+            vendorId: subscriptionPlan.vendorId,
+            planId: subscriptionPlan._id,
+            planName: subscriptionPlan.name,
+            totalTokens: subscriptionPlan.totalTokens,
+            remainingTokens: subscriptionPlan.totalTokens,
+            pricePaid: subscriptionPlan.price,
+            purchaseDate: today,
+            expiryDate,
+            status: 'active',
+          },
+        ],
+        { session },
+      );
+      subscriptionDoc = created[0];
+    }
 
     await session.commitTransaction();
 
@@ -113,7 +157,7 @@ export const buyPlansService = async (
       message: `You purchased the "${subscriptionPlan.name}" plan from ${vendor.businessName}. You now have ${subscriptionPlan.totalTokens} tokens. Enjoy your meals!`,
       type: 'subscription',
       data: {
-        subscriptionId: subscription[0]._id,
+        subscriptionId: subscriptionDoc._id,
         vendorId: vendor._id,
         planName: subscriptionPlan.name,
         tokens: subscriptionPlan.totalTokens,
@@ -127,13 +171,13 @@ export const buyPlansService = async (
       message: `A customer just purchased your "${subscriptionPlan.name}" subscription plan.`,
       type: 'subscription',
       data: {
-        subscriptionId: subscription[0]._id,
+        subscriptionId: subscriptionDoc._id,
         customerId: customer._id,
         planName: subscriptionPlan.name,
       },
     });
 
-    return subscription[0];
+    return subscriptionDoc;
   } catch (error) {
     await session.abortTransaction();
     throw error;

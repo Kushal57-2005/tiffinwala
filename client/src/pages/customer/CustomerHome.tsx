@@ -1018,12 +1018,14 @@ export default function CustomerHome({
   const calculateOrderTotal = () => {
     if (!selectedVendor) return 0;
     let total = 0;
-    orderTierItems.forEach((item) => {
-      const tier = selectedVendor.tiers.find((t) => t.name === item.tierName);
-      if (tier) {
-        total += tier.price * (item.quantity || 1);
-      }
-    });
+    if (paymentMethod !== 'token') {
+      orderTierItems.forEach((item) => {
+        const tier = selectedVendor.tiers.find((t) => t.name === item.tierName);
+        if (tier) {
+          total += tier.price * (item.quantity || 1);
+        }
+      });
+    }
     orderAddOnItems.forEach((item) => {
       const addon = selectedVendor.addOns.find((a) => a.name === item.addOnName);
       if (addon) {

@@ -9,6 +9,8 @@ interface MobileNavbarProps {
     | 'connections'
     | 'ratings'
     | 'dashboard'
+    | 'chat'
+    | 'history'
     | 'none';
 }
 
@@ -31,10 +33,16 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
     ? '/customer/subscriptions'
     : '/vendor/subscriptions';
   const connPath = isCustomer ? '/customer/connections' : '/vendor/connections';
+  const chatPath = isCustomer ? '/customer/chat' : '/vendor/chat';
   const ratingsPath = '/vendor/ratings';
+  const historyPath = isCustomer ? '/customer/history' : '/vendor/history';
 
   return (
-    <div className="flex md:hidden items-center justify-center gap-4 py-2 mb-6">
+    <div className="flex md:hidden items-center justify-start sm:justify-center gap-2 py-2 mb-6 overflow-x-auto no-scrollbar scroll-smooth w-full select-none">
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
       {/* Home Button */}
       <button
         onClick={() => navigate(homePath)}
@@ -135,6 +143,56 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      </button>
+
+      {/* Messages Button */}
+      <button
+        onClick={() => navigate(chatPath)}
+        className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+          activeTab === 'chat'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
+        }`}
+        title="Messages"
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          />
+        </svg>
+      </button>
+
+      {/* History Button */}
+      <button
+        onClick={() => navigate(historyPath)}
+        className={`w-12 h-12 rounded-2xl border border-charcoal/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer shrink-0 ${
+          activeTab === 'history'
+            ? activeBg
+            : 'bg-white/70 text-charcoal/80 ' + hoverBg
+        }`}
+        title="Order History"
+      >
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
       </button>

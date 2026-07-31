@@ -6,6 +6,8 @@ import { ApiError } from '../utils/api-error';
 import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
 import { Order } from '../models/Order.model';
+import { Subscription } from '../models/Subscription.model';
+import { DuePayment } from '../models/DuePayment.model';
 
 export const getNearbyVendorService = async (userId: string) => {
   const customer = await Customer.findOne({ userId });
@@ -396,17 +398,17 @@ export const customerDashboardService = async (
 
   start.setHours(0, 0, 0, 0);
 
-  const dashboard = await Order.aggregate([
+  // 1. Fetch Order Stats
+  const orderStats = await Order.aggregate([
     {
       $match: {
         customerId: customer._id,
+        status: { $in: ['accepted', 'delivered', 'received'] },
         date: { $gte: start, $lte: end },
       },
     },
-
     {
       $facet: {
-        // 🔹 1. Total Tiffins
         totalTiffins: [
           { $unwind: '$tiers' },
           {
@@ -416,9 +418,10 @@ export const customerDashboardService = async (
             },
           },
         ],
-
-        // 🔹 2. Total Amount
         totalAmount: [
+          {
+            $match: { paymentMethod: { $ne: 'payLater' } },
+          },
           {
             $group: {
               _id: null,
@@ -426,13 +429,19 @@ export const customerDashboardService = async (
             },
           },
         ],
-
-        // 🔹 3. Vendor Breakdown
         vendorStats: [
           {
             $group: {
               _id: '$vendorId',
-              totalAmount: { $sum: '$totalAmount' },
+              totalAmount: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$paymentMethod', 'payLater'] },
+                    0,
+                    '$totalAmount',
+                  ],
+                },
+              },
               tiers: { $push: '$tiers' },
             },
           },
@@ -464,12 +473,11 @@ export const customerDashboardService = async (
             },
           },
         ],
-
-        // 🔹 4. Profile Breakdown
         profileStats: [
           {
             $project: {
               items: { $concatArrays: ['$tiers', '$addOns'] },
+              paymentMethod: 1,
             },
           },
           { $unwind: '$items' },
@@ -484,7 +492,11 @@ export const customerDashboardService = async (
               totalQuantity: { $sum: '$items.quantity' },
               totalAmount: {
                 $sum: {
-                  $multiply: ['$items.quantity', '$items.pricePerUnit'],
+                  $cond: [
+                    { $eq: ['$paymentMethod', 'payLater'] },
+                    0,
+                    { $multiply: ['$items.quantity', '$items.pricePerUnit'] },
+                  ],
                 },
               },
             },
@@ -498,8 +510,6 @@ export const customerDashboardService = async (
             },
           },
         ],
-
-        // 🔹 5. Daily Breakdown
         dailyBreakdown: [
           {
             $lookup: {
@@ -510,12 +520,10 @@ export const customerDashboardService = async (
             },
           },
           { $unwind: '$vendor' },
-
           {
             $project: {
               date: 1,
               vendorName: '$vendor.businessName',
-
               tiers: {
                 $map: {
                   input: '$tiers',
@@ -527,7 +535,6 @@ export const customerDashboardService = async (
                   },
                 },
               },
-
               addOns: {
                 $map: {
                   input: '$addOns',
@@ -541,20 +548,347 @@ export const customerDashboardService = async (
               },
             },
           },
-
-          { $sort: { date: -1 } },
         ],
       },
     },
   ]);
 
-  const result = dashboard[0];
+  // 2. Fetch Subscription Stats
+  const subscriptionStats = await Subscription.aggregate([
+    {
+      $match: {
+        customerId: customer._id,
+        purchaseDate: { $gte: start, $lte: end },
+      },
+    },
+    {
+      $facet: {
+        totalAmount: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$pricePaid' },
+            },
+          },
+        ],
+        vendorStats: [
+          {
+            $group: {
+              _id: '$vendorId',
+              totalAmount: { $sum: '$pricePaid' },
+              totalTiffins: { $sum: 0 },
+            },
+          },
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+          {
+            $project: {
+              vendorId: '$_id',
+              vendorName: '$vendor.businessName',
+              totalAmount: 1,
+              totalTiffins: 1,
+              _id: 0,
+            },
+          },
+        ],
+        dailyBreakdown: [
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: 'vendorId',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+          {
+            $project: {
+              date: '$purchaseDate',
+              vendorName: '$vendor.businessName',
+              tiers: [
+                {
+                  name: { $concat: ['Subscription: ', '$planName'] },
+                  quantity: 1,
+                  profile: 'Myself',
+                },
+              ],
+              addOns: [],
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  // 3. Fetch Due Payment Stats
+  const duePaymentStats = await DuePayment.aggregate([
+    {
+      $match: {
+        customerId: customer._id,
+        createdAt: { $gte: start, $lte: end },
+      },
+    },
+    {
+      $facet: {
+        totalAmount: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$amount' },
+            },
+          },
+        ],
+        vendorStats: [
+          {
+            $group: {
+              _id: '$vendorId',
+              totalAmount: { $sum: '$amount' },
+              totalTiffins: { $sum: 0 },
+            },
+          },
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+          {
+            $project: {
+              vendorId: '$_id',
+              vendorName: '$vendor.businessName',
+              totalAmount: 1,
+              totalTiffins: 1,
+              _id: 0,
+            },
+          },
+        ],
+        dailyBreakdown: [
+          {
+            $lookup: {
+              from: 'vendors',
+              localField: 'vendorId',
+              foreignField: '_id',
+              as: 'vendor',
+            },
+          },
+          { $unwind: '$vendor' },
+          {
+            $project: {
+              date: '$createdAt',
+              vendorName: '$vendor.businessName',
+              tiers: [
+                {
+                  name: 'Cleared Pending Dues',
+                  quantity: 1,
+                  profile: 'Myself',
+                },
+              ],
+              addOns: [],
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const orderRes = orderStats[0];
+  const subRes = subscriptionStats[0];
+  const dueRes = duePaymentStats[0];
+
+  const orderAmt = orderRes.totalAmount[0]?.total || 0;
+  const subAmt = subRes.totalAmount[0]?.total || 0;
+  const dueAmt = dueRes.totalAmount[0]?.total || 0;
+
+  const totalAmount = orderAmt + subAmt + dueAmt;
+  const totalTiffins = orderRes.totalTiffins[0]?.total || 0;
+
+  // Merge Vendor Stats
+  const vendorMap = new Map<
+    string,
+    { vendorId: any; vendorName: string; totalAmount: number; totalTiffins: number }
+  >();
+
+  const addVendorStats = (stats: any[]) => {
+    for (const item of stats) {
+      if (!item.vendorId) continue;
+      const key = item.vendorId.toString();
+      if (!vendorMap.has(key)) {
+        vendorMap.set(key, {
+          vendorId: item.vendorId,
+          vendorName: item.vendorName,
+          totalAmount: item.totalAmount || 0,
+          totalTiffins: item.totalTiffins || 0,
+        });
+      } else {
+        const exist = vendorMap.get(key)!;
+        exist.totalAmount += item.totalAmount || 0;
+        exist.totalTiffins += item.totalTiffins || 0;
+      }
+    }
+  };
+
+  addVendorStats(orderRes.vendorStats || []);
+  addVendorStats(subRes.vendorStats || []);
+  addVendorStats(dueRes.vendorStats || []);
+
+  const vendorStats = Array.from(vendorMap.values());
+
+  // Merge Profile Stats
+  const profileMap = new Map<
+    string,
+    { profile: string; totalQuantity: number; totalAmount: number }
+  >();
+
+  for (const item of orderRes.profileStats || []) {
+    profileMap.set(item.profile, {
+      profile: item.profile,
+      totalQuantity: item.totalQuantity || 0,
+      totalAmount: item.totalAmount || 0,
+    });
+  }
+
+  if (subAmt > 0) {
+    const exist = profileMap.get('Myself') || {
+      profile: 'Myself',
+      totalQuantity: 0,
+      totalAmount: 0,
+    };
+    exist.totalAmount += subAmt;
+    profileMap.set('Myself', exist);
+  }
+
+  if (dueAmt > 0) {
+    const exist = profileMap.get('Myself') || {
+      profile: 'Myself',
+      totalQuantity: 0,
+      totalAmount: 0,
+    };
+    exist.totalAmount += dueAmt;
+    profileMap.set('Myself', exist);
+  }
+
+  const profileStats = Array.from(profileMap.values());
+
+  // Merge and Sort Daily Breakdown
+  const dailyBreakdown = [
+    ...(orderRes.dailyBreakdown || []),
+    ...(subRes.dailyBreakdown || []),
+    ...(dueRes.dailyBreakdown || []),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return {
-    totalTiffins: result.totalTiffins[0]?.total || 0,
-    totalAmount: result.totalAmount[0]?.total || 0,
-    vendorStats: result.vendorStats || [],
-    profileStats: result.profileStats || [],
-    dailyBreakdown: result.dailyBreakdown || [],
+    totalTiffins,
+    totalAmount,
+    vendorStats,
+    profileStats,
+    dailyBreakdown,
   };
+};
+
+export const customerHistoryService = async (userId: string) => {
+  const customer = await Customer.findOne({ userId });
+  if (!customer) throw new ApiError(404, 'Customer not found');
+
+  const orders = await Order.aggregate([
+    {
+      $match: {
+        customerId: customer._id,
+      },
+    },
+    {
+      $lookup: {
+        from: 'vendors',
+        localField: 'vendorId',
+        foreignField: '_id',
+        as: 'vendor',
+      },
+    },
+    {
+      $unwind: {
+        path: '$vendor',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $project: {
+        date: 1,
+        vendorName: '$vendor.businessName',
+        totalAmount: 1,
+        session: 1,
+        status: 1,
+        profile: { $ifNull: [{ $arrayElemAt: ['$forProfiles', 0] }, 'N/A'] },
+
+        items: {
+          $concatArrays: [
+            {
+              $map: {
+                input: { $ifNull: ['$tiers', []] },
+                as: 't',
+                in: {
+                  type: 'tier',
+                  name: '$$t.tierName',
+                  quantity: '$$t.quantity',
+                  price: '$$t.pricePerUnit',
+                },
+              },
+            },
+            {
+              $map: {
+                input: { $ifNull: ['$addOns', []] },
+                as: 'a',
+                in: {
+                  type: 'addon',
+                  name: '$$a.addOnName',
+                  quantity: '$$a.quantity',
+                  price: '$$a.pricePerUnit',
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          date: '$date',
+          vendorId: '$vendorName',
+        },
+        orders: {
+          $push: {
+            session: '$session',
+            status: '$status',
+            totalAmount: '$totalAmount',
+            profile: '$profile',
+            items: '$items',
+          },
+        },
+        totalSpent: { $sum: '$totalAmount' },
+      },
+    },
+    {
+      $sort: { '_id.date': -1 },
+    },
+    {
+      $project: {
+        _id: 0,
+        date: '$_id.date',
+        vendorName: '$_id.vendorId',
+        totalSpent: 1,
+        orders: 1,
+      },
+    },
+  ]);
+
+  return orders;
 };

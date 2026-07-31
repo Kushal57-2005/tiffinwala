@@ -480,10 +480,22 @@ export const VendorSubscriptions: React.FC = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-scale-up">
-                  {subscribers.map((sub) => {
-                    const customerUser = sub.customerId?.userId;
-                    const customerName = customerUser ? `${customerUser.firstName} ${customerUser.lastName}` : 'Customer';
-                    const customerPhone = customerUser?.phone || 'No phone';
+                  {[...subscribers]
+                    .sort((a, b) => {
+                      const getStatusScore = (sub: any) => {
+                        const expDate = new Date(sub.expiryDate);
+                        const isExpired = sub.status === 'expired' || expDate < new Date();
+                        const isExhausted = sub.status === 'exhausted' || sub.remainingTokens <= 0;
+                        if (!isExpired && !isExhausted) return 1; // Active
+                        if (isExpired) return 2; // Expired
+                        return 3; // Exhausted
+                      };
+                      return getStatusScore(a) - getStatusScore(b);
+                    })
+                    .map((sub) => {
+                      const customerUser = sub.customerId?.userId;
+                      const customerName = customerUser ? `${customerUser.firstName} ${customerUser.lastName}` : 'Customer';
+                      const customerPhone = customerUser?.phone || 'No phone';
 
                     const remaining = sub.remainingTokens;
                     const total = sub.totalTokens;

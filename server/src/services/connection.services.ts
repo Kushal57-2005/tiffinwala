@@ -5,6 +5,7 @@ import { Vendor } from '../models/Vendor.model';
 import { ApiError } from '../utils/api-error';
 import { createNotification } from '../utils/notification';
 import { User } from '../models/User.model';
+import { DuePayment } from '../models/DuePayment.model';
 
 export const requestConnectionService = async (
   userId: string,
@@ -93,10 +94,13 @@ export const respondConnectionService = async (
   connection.status = action === 'accept' ? 'accepted' : 'rejected';
   await connection.save();
 
+  const customer = await Customer.findById(connection.customerId);
+  if (!customer) throw new ApiError(404, 'Customer not found');
+
   if (connection.status === 'accepted') {
     // Notify customer: connection accepted
     await createNotification({
-      userId: connection.customerId,
+      userId: customer.userId,
       title: 'Connection Accepted ✓',
       message: `${vendor.businessName} accepted your connection request. You can now place Pay-Later orders!`,
       type: 'system',
@@ -108,7 +112,7 @@ export const respondConnectionService = async (
   } else {
     // Notify customer: connection rejected
     await createNotification({
-      userId: connection.customerId,
+      userId: customer.userId,
       title: 'Connection Request Declined',
       message: `${vendor.businessName} declined your connection request. You can still place Wallet or Token orders.`,
       type: 'system',
@@ -165,14 +169,41 @@ export const payDueService = async (userId: string, connectionId: string) => {
     }
 
     customer.walletBalance -= connection.pendingDue;
+
     const amountPaid = connection.pendingDue;
+    
+    const vendor = await Vendor.findById(connection.vendorId).session(session);
+    if (!vendor) throw new ApiError(404, 'Vendor not found');
+    if (vendor.isPlatformDebtFlagged === true) {
+      const platformFee = Math.round(connection.pendingDue * 0.1);
+      const vendorShare = connection.pendingDue - platformFee;
+      vendor.platformBalance += platformFee;
+      vendor.walletBalance += vendorShare;
+      console.log('plat+wall');
+      await vendor.save({ session });
+    } else {
+      vendor.walletBalance += connection.pendingDue;
+      console.log('wall');
+      await vendor.save({ session });
+    }
     connection.pendingDue = 0;
 
     await customer.save({ session });
     await connection.save({ session });
 
+    await DuePayment.create(
+      [
+        {
+          customerId: customer._id,
+          vendorId: vendor._id,
+          connectionId: connection._id,
+          amount: amountPaid,
+        },
+      ],
+      { session }
+    );
+
     // Fetch vendor to get userId for notification
-    const vendor = await Vendor.findById(connection.vendorId).session(session);
 
     await session.commitTransaction();
     session.endSession();
@@ -191,19 +222,17 @@ export const payDueService = async (userId: string, connectionId: string) => {
     });
 
     // Notify vendor: payment received
-    if (vendor) {
-      await createNotification({
-        userId: vendor.userId,
-        title: 'Due Payment Received',
-        message: `A customer has paid ₹${amountPaid} towards their pending due.`,
-        type: 'payment',
-        data: {
-          connectionId: connection._id,
-          customerId: customer._id,
-          amountPaid,
-        },
-      });
-    }
+    await createNotification({
+      userId: vendor.userId,
+      title: 'Due Payment Received',
+      message: `A customer has paid ₹${amountPaid} towards their pending due.`,
+      type: 'payment',
+      data: {
+        connectionId: connection._id,
+        customerId: customer._id,
+        amountPaid,
+      },
+    });
 
     return connection;
   } catch (err) {

@@ -1,6 +1,7 @@
 import {
   addFriendProfileService,
   customerDashboardService,
+  customerHistoryService,
   editFriendProfileService,
   getCustomerProfileService,
   getFriendProfilesService,
@@ -204,5 +205,16 @@ export const customerDashboard = asyncHandler(
     return res
       .status(200)
       .json(new ApiResponse(200, result, 'Customer dashboard Fetched'));
+  },
+);
+
+export const customerHistory = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.userId as string;
+    const result = await customerHistoryService(userId);
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, result, 'Order history is fetch'));
   },
 );

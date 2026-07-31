@@ -7,6 +7,12 @@ import { getTodayUTC } from '../utils/getTodayUTC';
 import { getCurrentSession } from '../utils/session';
 import { Subscription } from '../models/Subscription.model';
 import { Order } from '../models/Order.model';
+import { DuePayment } from '../models/DuePayment.model';
+import { createNotification } from '../utils/notification';
+import { Customer } from '../models/Customer.model';
+import { Notification } from '../models/Notification.model';
+import { sendRealtimeNotification } from '../socket/socketManager';
+import { Connection } from '../models/Connection.model';
 
 export const toggleVendorOpenService = async (userId: string) => {
   const vendor = await Vendor.findOne({ userId });
@@ -71,6 +77,8 @@ export const createMenuService = async (
     { $set: { isExpired: true } },
   );
 
+  let menuItem;
+
   if (existing) {
     // Locked fields (name, price, items, maxQuantity, remainingQuantity)
     // for tiers that already exist — only NEW tiers get added as-is
@@ -84,22 +92,50 @@ export const createMenuService = async (
     existing.addOns = addOns || [];
     existing.description = description;
     await existing.save();
-    return existing;
+    menuItem = existing;
+  } else {
+    const tiersWithRemaining = tiers.map((tier) => ({
+      ...tier,
+      remainingQuantity: tier.maxQuantity,
+    }));
+
+    menuItem = await MenuItem.create({
+      vendorId: vendor._id,
+      session,
+      tiers: tiersWithRemaining,
+      addOns: addOns || [],
+      description,
+      date: today,
+      isExpired: false,
+    });
   }
 
-  const tiersWithRemaining = tiers.map((tier) => ({
-    ...tier,
-    remainingQuantity: tier.maxQuantity,
+  // Find all customers who have an active (status: 'accepted') connection with this vendor
+  const connections = await Connection.find({
+    vendorId: vendor._id,
+    status: 'accepted',
+  });
+
+  const customerIds = connections.map((conn) => conn.customerId);
+  const customers = await Customer.find({
+    _id: { $in: customerIds },
+  }).select('userId');
+
+  const notifications = customers.map((customer) => ({
+    userId: customer.userId,
+    title: `Menu uploaded by ${vendor.businessName}`,
+    message: `${vendor.businessName} uploaded menu for ${session}. Order fast.`,
+    type: 'menu',
+    data: {
+      menuId: menuItem._id,
+      vendorId: menuItem.vendorId,
+      tiers,
+    },
   }));
 
-  const menuItem = await MenuItem.create({
-    vendorId: vendor._id,
-    session,
-    tiers: tiersWithRemaining,
-    addOns: addOns || [],
-    description,
-    date: today,
-    isExpired: false,
+  const insertedNotifications = await Notification.insertMany(notifications);
+  insertedNotifications.forEach((notif) => {
+    sendRealtimeNotification(notif.userId.toString(), notif);
   });
 
   return menuItem;
@@ -228,17 +264,17 @@ export const vendorDashboardService = async (
 
   const PLATFORM_FEE_PERCENT = 10;
 
-  const dashboard = await Order.aggregate([
+  // 1. Fetch Order Stats
+  const orderStats = await Order.aggregate([
     {
       $match: {
         vendorId: vendor._id,
+        status: { $in: ['accepted', 'delivered', 'received'] },
         date: { $gte: start, $lte: end },
       },
     },
-
     {
       $facet: {
-        // 🔹 1. Total Tiffins Sold
         totalTiffins: [
           { $unwind: '$tiers' },
           {
@@ -248,9 +284,10 @@ export const vendorDashboardService = async (
             },
           },
         ],
-
-        // 🔹 2. Revenue
         totalRevenue: [
+          {
+            $match: { paymentMethod: { $ne: 'payLater' } },
+          },
           {
             $group: {
               _id: null,
@@ -258,13 +295,19 @@ export const vendorDashboardService = async (
             },
           },
         ],
-
-        // 🔹 3. Customer-wise sales
         customerStats: [
           {
             $group: {
               _id: '$customerId',
-              totalSpent: { $sum: '$totalAmount' },
+              totalSpent: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$paymentMethod', 'payLater'] },
+                    0,
+                    '$totalAmount',
+                  ],
+                },
+              },
               orders: { $sum: 1 },
             },
           },
@@ -277,7 +320,6 @@ export const vendorDashboardService = async (
             },
           },
           { $unwind: '$customer' },
-
           {
             $lookup: {
               from: 'users',
@@ -287,7 +329,6 @@ export const vendorDashboardService = async (
             },
           },
           { $unwind: '$user' },
-
           {
             $project: {
               customerId: '$_id',
@@ -300,8 +341,6 @@ export const vendorDashboardService = async (
             },
           },
         ],
-
-        // 🔹 4. Monthly Payslip
         monthlyPayslip: [
           {
             $group: {
@@ -309,7 +348,15 @@ export const vendorDashboardService = async (
                 year: { $year: '$date' },
                 month: { $month: '$date' },
               },
-              revenue: { $sum: '$totalAmount' },
+              revenue: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$paymentMethod', 'payLater'] },
+                    0,
+                    '$totalAmount',
+                  ],
+                },
+              },
             },
           },
           {
@@ -317,40 +364,380 @@ export const vendorDashboardService = async (
               year: '$_id.year',
               month: '$_id.month',
               revenue: 1,
-              platformFee: {
-                $multiply: ['$revenue', PLATFORM_FEE_PERCENT / 100],
-              },
-              netEarnings: {
-                $subtract: [
-                  '$revenue',
-                  {
-                    $multiply: ['$revenue', PLATFORM_FEE_PERCENT / 100],
-                  },
-                ],
-              },
               _id: 0,
             },
           },
-          { $sort: { year: -1, month: -1 } },
         ],
       },
     },
   ]);
 
-  const result = dashboard[0];
+  // 2. Fetch Subscription Stats
+  const subscriptionStats = await Subscription.aggregate([
+    {
+      $match: {
+        vendorId: vendor._id,
+        purchaseDate: { $gte: start, $lte: end },
+      },
+    },
+    {
+      $facet: {
+        totalRevenue: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$pricePaid' },
+            },
+          },
+        ],
+        customerStats: [
+          {
+            $group: {
+              _id: '$customerId',
+              totalSpent: { $sum: '$pricePaid' },
+            },
+          },
+          {
+            $lookup: {
+              from: 'customers',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'customer',
+            },
+          },
+          { $unwind: '$customer' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'customer.userId',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $project: {
+              customerId: '$_id',
+              name: {
+                $concat: ['$user.firstName', ' ', '$user.lastName'],
+              },
+              totalSpent: 1,
+              orders: { $literal: 0 },
+              _id: 0,
+            },
+          },
+        ],
+        monthlyPayslip: [
+          {
+            $group: {
+              _id: {
+                year: { $year: '$purchaseDate' },
+                month: { $month: '$purchaseDate' },
+              },
+              revenue: { $sum: '$pricePaid' },
+            },
+          },
+          {
+            $project: {
+              year: '$_id.year',
+              month: '$_id.month',
+              revenue: 1,
+              _id: 0,
+            },
+          },
+        ],
+      },
+    },
+  ]);
 
-  const totalRevenue = result.totalRevenue[0]?.total || 0;
-  const totalTiffins = result.totalTiffins[0]?.total || 0;
+  // 3. Fetch Due Payment Stats
+  const duePaymentStats = await DuePayment.aggregate([
+    {
+      $match: {
+        vendorId: vendor._id,
+        createdAt: { $gte: start, $lte: end },
+      },
+    },
+    {
+      $facet: {
+        totalRevenue: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$amount' },
+            },
+          },
+        ],
+        customerStats: [
+          {
+            $group: {
+              _id: '$customerId',
+              totalSpent: { $sum: '$amount' },
+            },
+          },
+          {
+            $lookup: {
+              from: 'customers',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'customer',
+            },
+          },
+          { $unwind: '$customer' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'customer.userId',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $project: {
+              customerId: '$_id',
+              name: {
+                $concat: ['$user.firstName', ' ', '$user.lastName'],
+              },
+              totalSpent: 1,
+              orders: { $literal: 0 },
+              _id: 0,
+            },
+          },
+        ],
+        monthlyPayslip: [
+          {
+            $group: {
+              _id: {
+                year: { $year: '$createdAt' },
+                month: { $month: '$createdAt' },
+              },
+              revenue: { $sum: '$amount' },
+            },
+          },
+          {
+            $project: {
+              year: '$_id.year',
+              month: '$_id.month',
+              revenue: 1,
+              _id: 0,
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const orderRes = orderStats[0];
+  const subRes = subscriptionStats[0];
+  const dueRes = duePaymentStats[0];
+
+  const orderRev = orderRes.totalRevenue[0]?.total || 0;
+  const subRev = subRes.totalRevenue[0]?.total || 0;
+  const dueRev = dueRes.totalRevenue[0]?.total || 0;
+
+  const totalRevenue = orderRev + subRev + dueRev;
+  const totalTiffins = orderRes.totalTiffins[0]?.total || 0;
 
   const platformFee = (totalRevenue * PLATFORM_FEE_PERCENT) / 100;
   const netEarnings = totalRevenue - platformFee;
+
+  // Merge Customer Stats
+  const customerMap = new Map<
+    string,
+    { customerId: any; name: string; totalSpent: number; orders: number }
+  >();
+
+  const addCustomerStats = (stats: any[]) => {
+    for (const item of stats) {
+      if (!item.customerId) continue;
+      const key = item.customerId.toString();
+      if (!customerMap.has(key)) {
+        customerMap.set(key, {
+          customerId: item.customerId,
+          name: item.name,
+          totalSpent: item.totalSpent || 0,
+          orders: item.orders || 0,
+        });
+      } else {
+        const exist = customerMap.get(key)!;
+        exist.totalSpent += item.totalSpent || 0;
+        exist.orders += item.orders || 0;
+      }
+    }
+  };
+
+  addCustomerStats(orderRes.customerStats || []);
+  addCustomerStats(subRes.customerStats || []);
+  addCustomerStats(dueRes.customerStats || []);
+
+  const customerStats = Array.from(customerMap.values());
+
+  // Merge Monthly Payslips
+  const payslipMap = new Map<
+    string,
+    { year: number; month: number; revenue: number }
+  >();
+
+  const addPayslipStats = (slips: any[]) => {
+    for (const slip of slips) {
+      if (!slip.year || !slip.month) continue;
+      const key = `${slip.year}-${slip.month}`;
+      if (!payslipMap.has(key)) {
+        payslipMap.set(key, {
+          year: slip.year,
+          month: slip.month,
+          revenue: slip.revenue || 0,
+        });
+      } else {
+        payslipMap.get(key)!.revenue += slip.revenue || 0;
+      }
+    }
+  };
+
+  addPayslipStats(orderRes.monthlyPayslip || []);
+  addPayslipStats(subRes.monthlyPayslip || []);
+  addPayslipStats(dueRes.monthlyPayslip || []);
+
+  const monthlyPayslip = Array.from(payslipMap.values())
+    .map((slip) => {
+      const revenue = slip.revenue;
+      const platformFee = (revenue * PLATFORM_FEE_PERCENT) / 100;
+      const netEarnings = revenue - platformFee;
+      return {
+        year: slip.year,
+        month: slip.month,
+        revenue,
+        platformFee,
+        netEarnings,
+      };
+    })
+    .sort((a, b) => b.year - a.year || b.month - a.month);
 
   return {
     totalTiffins,
     totalRevenue,
     platformFee,
     netEarnings,
-    customerStats: result.customerStats || [],
-    monthlyPayslip: result.monthlyPayslip || [],
+    customerStats,
+    monthlyPayslip,
   };
+};
+
+export const vendorHistoryService = async (userId: string) => {
+  const vendor = await Vendor.findOne({ userId });
+  if (!vendor) throw new ApiError(404, 'Vendor not found');
+
+  const orders = await Order.aggregate([
+    {
+      $match: {
+        vendorId: vendor._id,
+      },
+    },
+    {
+      $lookup: {
+        from: 'customers',
+        localField: 'customerId',
+        foreignField: '_id',
+        as: 'customer',
+      },
+    },
+    {
+      $unwind: {
+        path: '$customer',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'customer.userId',
+        foreignField: '_id',
+        as: 'user',
+      },
+    },
+    {
+      $unwind: {
+        path: '$user',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $project: {
+        date: 1,
+        customer: {
+          _id: '$customer._id',
+          firstName: '$user.firstName',
+          lastName: '$user.lastName',
+        },
+        totalAmount: 1,
+        session: 1,
+        status: 1,
+        profile: {
+          $ifNull: [{ $arrayElemAt: ['$forProfiles', 0] }, 'N/A'],
+        },
+        items: {
+          $concatArrays: [
+            {
+              $map: {
+                input: { $ifNull: ['$tiers', []] },
+                as: 't',
+                in: {
+                  type: 'tier',
+                  name: '$$t.tierName',
+                  quantity: '$$t.quantity',
+                  price: '$$t.pricePerUnit',
+                },
+              },
+            },
+            {
+              $map: {
+                input: { $ifNull: ['$addOns', []] },
+                as: 'a',
+                in: {
+                  type: 'addon',
+                  name: '$$a.addOnName',
+                  quantity: '$$a.quantity',
+                  price: '$$a.pricePerUnit',
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          date: '$date',
+          customerId: '$customer._id',
+        },
+        customer: { $first: '$customer' },
+        orders: {
+          $push: {
+            session: '$session',
+            status: '$status',
+            totalAmount: '$totalAmount',
+            profile: '$profile',
+            items: '$items',
+          },
+        },
+        totalRevenue: { $sum: '$totalAmount' },
+      },
+    },
+    {
+      $sort: { '_id.date': -1 },
+    },
+    {
+      $project: {
+        _id: 0,
+        date: '$_id.date',
+        customer: 1,
+        totalRevenue: 1,
+        orders: 1,
+      },
+    },
+  ]);
+
+  return orders;
 };

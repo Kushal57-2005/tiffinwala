@@ -1,7 +1,14 @@
 import { Notification } from '../models/Notification.model';
 import mongoose from 'mongoose';
+import { sendRealtimeNotification } from '../socket/socketManager';
 
-type NotificationType = 'order' | 'payment' | 'subscription' | 'system';
+type NotificationType =
+  | 'order'
+  | 'payment'
+  | 'subscription'
+  | 'system'
+  | 'menu'
+  | 'chat';
 
 interface CreateNotificationInput {
   userId: string | mongoose.Types.ObjectId;
@@ -26,6 +33,11 @@ export const createNotification = async ({
       type,
       data,
     });
+
+    if (notification) {
+      // Immediately call sendRealtimeNotification()
+      sendRealtimeNotification(userId.toString(), notification);
+    }
 
     return notification;
   } catch (error) {

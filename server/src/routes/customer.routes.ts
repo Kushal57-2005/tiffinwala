@@ -14,6 +14,7 @@ import {
   getVendorPublicDetails,
   getOrderForCustomer,
   customerDashboard,
+  customerHistory,
 } from '../controllers/customer.contoller';
 import { searchVendors } from '../controllers/vendor.contoller';
 import { getSubscriptionsPlansForCustomers } from '../controllers/subscription.contoller';
@@ -95,11 +96,18 @@ router.get(
   requireRole('customer'),
   getSubscriptionsPlansForCustomers,
 );
-export default router;
-
 router.get(
   '/dashboard',
   authMiddleware,
   requireRole('customer'),
   customerDashboard,
 );
+
+router.get(
+  '/history',
+  authMiddleware,
+  requireRole('customer'),
+  customerHistory,
+);
+
+export default router;

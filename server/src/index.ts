@@ -10,6 +10,7 @@ import { initSocket } from './socket/chat.socket';
 import { addUserSocket, removeUserSocket } from './socket/socketManager';
 import { startMonthlyBillJob } from './cronJob/startMonthlyCronJob.job';
 import { startTokenExpiryJob } from './cronJob/token-expiry.job';
+import { seedGuestUsers } from './utils/seedGuestUsers';
 
 const port = parseInt(process.env.PORT || '5000', 10);
 
@@ -42,7 +43,8 @@ io.on('connection', (socket: Socket) => {
 });
 
 connectDB()
-  .then(() => {
+  .then(async () => {
+    await seedGuestUsers();
     startMonthlyBillJob();
     startTokenExpiryJob();
     httpServer.listen(port, () => {

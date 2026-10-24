@@ -247,6 +247,79 @@ export default function Login() {
         }, 400);
     };
 
+    const handleGuestAutoLogin = async (guestRole: 'customer' | 'vendor') => {
+        setError('');
+        setSuccess('');
+        setLoading(true);
+        setIsLatching(true);
+
+        const email =
+            guestRole === 'customer'
+                ? 'customer@tiffinwala.com'
+                : 'vendor@tiffinwala.com';
+        const pwd =
+            guestRole === 'customer' ? 'customer@123' : 'vendor@123';
+
+        setRole(guestRole);
+        setEmailOrPhone(email);
+        setPassword(pwd);
+
+        try {
+            if (guestRole === 'customer') {
+                const res = await api.post('/auth/login/customer', {
+                    emailOrPhone: email,
+                    password: pwd,
+                });
+                const { token, ...userData } = res.data.data;
+                localStorage.setItem('token', token);
+                setUser(userData);
+                setSuccess('Reviewer Customer access granted! Entering dashboard...');
+                setTimeout(() => {
+                    navigate('/customer/home');
+                }, 300);
+            } else {
+                const res = await api.post('/auth/login/vendor', {
+                    emailOrPhone: email,
+                    password: pwd,
+                });
+                if (res.data?.data?.token) {
+                    const { token, ...userData } = res.data.data;
+                    localStorage.setItem('token', token);
+                    setUser(userData);
+                    setSuccess('Reviewer Vendor access granted! Entering dashboard...');
+                    setTimeout(() => {
+                        navigate('/vendor/home');
+                    }, 300);
+                } else if (res.data?.data?.userId) {
+                    const otpCode = res.data?.data?.emailOTP || '123456';
+                    const step2Res = await api.post(
+                        '/auth/login/vendor/verify-otp',
+                        {
+                            userId: res.data.data.userId,
+                            otp: otpCode,
+                        },
+                    );
+                    const { token, ...userData } = step2Res.data.data;
+                    localStorage.setItem('token', token);
+                    setUser(userData);
+                    setSuccess('Reviewer Vendor access granted! Entering dashboard...');
+                    setTimeout(() => {
+                        navigate('/vendor/home');
+                    }, 300);
+                }
+            }
+        } catch (err: any) {
+            const errMsg =
+                err.response?.data?.message ||
+                err.message ||
+                'Guest login failed';
+            setError(errMsg);
+        } finally {
+            setLoading(false);
+            setIsLatching(false);
+        }
+    };
+
     const handleVendorLoginStep1 = async () => {
         setLoading(true);
         setError('');
@@ -257,6 +330,13 @@ export default function Login() {
                     emailOrPhone,
                     password,
                 });
+                if (res.data?.data?.token) {
+                    const { token, ...userData } = res.data.data;
+                    localStorage.setItem('token', token);
+                    setUser(userData);
+                    navigate('/vendor/home');
+                    return;
+                }
                 setUserId(res.data.data.userId);
                 showOtpToast(res.data.data);
                 setStep(2);
@@ -794,6 +874,59 @@ export default function Login() {
                                 />
                             </svg>
                             <span>{success}</span>
+                        </div>
+                    )}
+
+                    {/* Reviewer / Demo One-Click Access Card */}
+                    {step === 1 && (
+                        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 backdrop-blur-md shadow-sm">
+                            <div className="flex items-center justify-between mb-2.5">
+                                <div className="flex items-center space-x-2">
+                                    <span className="flex h-2.5 w-2.5 relative">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                                    </span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-charcoal font-display">
+                                        Reviewer Quick Access
+                                    </span>
+                                </div>
+                                <span className="text-[10px] font-medium text-charcoal/60 bg-white/60 px-2 py-0.5 rounded-full border border-black/5">
+                                    Auto-Run & Login
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-charcoal/70 mb-3 font-body leading-relaxed">
+                                Click below to instantly log in with pre-seeded demo accounts without manual typing:
+                            </p>
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => handleGuestAutoLogin('customer')}
+                                    disabled={loading}
+                                    className="py-2.5 px-3 rounded-xl bg-[#5C7A52]/15 hover:bg-[#5C7A52]/25 text-[#3b5234] border border-[#5C7A52]/30 text-xs font-bold flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                                >
+                                    <span className="flex items-center space-x-1">
+                                        <span>⚡</span>
+                                        <span>Guest Customer</span>
+                                    </span>
+                                    <span className="text-[9px] font-normal text-charcoal/60 mt-0.5">
+                                        customer@tiffinwala.com
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleGuestAutoLogin('vendor')}
+                                    disabled={loading}
+                                    className="py-2.5 px-3 rounded-xl bg-[#E0653A]/15 hover:bg-[#E0653A]/25 text-[#9d3c1a] border border-[#E0653A]/30 text-xs font-bold flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                                >
+                                    <span className="flex items-center space-x-1">
+                                        <span>⚡</span>
+                                        <span>Guest Vendor</span>
+                                    </span>
+                                    <span className="text-[9px] font-normal text-charcoal/60 mt-0.5">
+                                        vendor@tiffinwala.com
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     )}
 

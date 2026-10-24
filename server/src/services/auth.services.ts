@@ -6,6 +6,7 @@ import { sendEmailOTP } from '../utils/email';
 import { generateToken } from '../utils/jwt';
 import { generateOTP, getOTPExpiry, isOTPExpired } from '../utils/otp';
 import { sendPhoneOTP } from '../utils/phone';
+import { seedGuestUsers } from '../utils/seedGuestUsers';
 import crypto from 'crypto';
 
 export const verifyPhoneOTPService = async (userId: string, otp: string) => {
@@ -174,10 +175,15 @@ export const loginCustomerService = async (
     emailOrPhone: string,
     password: string,
 ) => {
-    const user = await User.findOne({
+    let user = await User.findOne({
         $or: [{ email: emailOrPhone }, { phone: emailOrPhone }],
         role: 'customer',
     });
+
+    if (!user && (emailOrPhone === 'customer@tiffinwala.com' || emailOrPhone === '9999999991')) {
+        await seedGuestUsers();
+        user = await User.findOne({ email: 'customer@tiffinwala.com' });
+    }
 
     if (!user) {
         throw new ApiError(404, 'Customer not found');
@@ -189,7 +195,12 @@ export const loginCustomerService = async (
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-        throw new ApiError(401, 'Invalid credentials');
+        if (user.email === 'customer@tiffinwala.com' && password === 'customer@123') {
+            user.password = 'customer@123';
+            await user.save();
+        } else {
+            throw new ApiError(401, 'Invalid credentials');
+        }
     }   
 
     const token = generateToken(user._id.toString(), user.role);
@@ -206,10 +217,16 @@ export const loginVendorService = async (
     emailOrPhone: string,
     password: string,
 ) => {
-    const user = await User.findOne({
+    let user = await User.findOne({
         $or: [{ email: emailOrPhone }, { phone: emailOrPhone }],
         role: 'vendor',
     });
+
+    if (!user && (emailOrPhone === 'vendor@tiffinwala.com' || emailOrPhone === '9999999992')) {
+        await seedGuestUsers();
+        user = await User.findOne({ email: 'vendor@tiffinwala.com' });
+    }
+
     if (!user) {
         throw new ApiError(404, 'Vendor is no found.');
     }
@@ -220,23 +237,49 @@ export const loginVendorService = async (
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-        throw new ApiError(401, 'Invalid credentials');
+        if (user.email === 'vendor@tiffinwala.com' && password === 'vendor@123') {
+            user.password = 'vendor@123';
+            await user.save();
+        } else {
+            throw new ApiError(401, 'Invalid credentials');
+        }
     }
 
     const vendor = await Vendor.findOne({ userId: user._id });
     if (!vendor?.isPaymentDone) {
-        throw new ApiError(403, 'Registration fee not paid yet', [
-            user._id.toString(),
-        ]);
+        if (user.email === 'vendor@tiffinwala.com') {
+            if (vendor) {
+                vendor.isPaymentDone = true;
+                await vendor.save();
+            }
+        } else {
+            throw new ApiError(403, 'Registration fee not paid yet', [
+                user._id.toString(),
+            ]);
+        }
     }
 
-    const emailOTP = generateOTP();
+    const isGuestVendor = user.email === 'vendor@tiffinwala.com';
+    const emailOTP = isGuestVendor ? '123456' : generateOTP();
     const emailOTPExpiry = getOTPExpiry();
 
     user.emailOTP = emailOTP;
     user.emailOTPExpiry = emailOTPExpiry;
     await user.save();
     await sendEmailOTP(user.email, emailOTP);
+
+    // For Guest Vendor, also return token directly so reviewers can auto-login in 1 click
+    if (isGuestVendor) {
+        const token = generateToken(user._id.toString(), user.role);
+        return {
+            token,
+            userId: user._id,
+            firstName: user.firstName,
+            role: user.role,
+            emailOTP,
+            message: 'Guest vendor authenticated successfully',
+        };
+    }
 
     return {
         userId: user._id,
@@ -253,11 +296,14 @@ export const loginVendorStep2Service = async (
     if (!user) {
         throw new ApiError(404, 'User Not Found');
     }
-    if (!user.emailOTPExpiry || isOTPExpired(user.emailOTPExpiry)) {
+
+    const isGuestVendor = user.email === 'vendor@tiffinwala.com';
+
+    if (!isGuestVendor && (!user.emailOTPExpiry || isOTPExpired(user.emailOTPExpiry))) {
         throw new ApiError(400, 'OTP expired, please login again');
     }
 
-    if (user.emailOTP !== otp) {
+    if (user.emailOTP !== otp && !(isGuestVendor && otp === '123456')) {
         throw new ApiError(400, 'Invalid OTP');
     }
 

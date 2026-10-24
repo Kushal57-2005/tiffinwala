@@ -15,14 +15,14 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
-// Auto-logout on 401 (expired / invalid token) — but NOT on the login page itself
+const PUBLIC_PATHS = ['/', '/login', '/register', '/forget-password', '/reset-password'];
+
+// Auto-logout on 401 (expired / invalid token) — but NOT on public pages
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (
-            error.response?.status === 401 &&
-            window.location.pathname !== '/login'
-        ) {
+        const isPublic = PUBLIC_PATHS.includes(window.location.pathname);
+        if (error.response?.status === 401 && !isPublic) {
             localStorage.removeItem('token');
             window.location.href = '/login';
         }

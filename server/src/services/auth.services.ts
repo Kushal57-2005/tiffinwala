@@ -72,7 +72,7 @@ export const registerCustomerService = async (
         (lat === 0 && lng === 0)
     ) {
         throw new ApiError(400, 'Please choose a valid location');
-    }
+    }   
 
     const existedUser = await User.findOne({
         $or: [{ phone }, { email }],

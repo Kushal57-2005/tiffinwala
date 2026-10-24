@@ -170,11 +170,15 @@ CLIENT_URL=frontenn_url
 git clone https://github.com/kushal57-2005/tiffinwala.git
 
 # Install dependencies
-cd client && npm install
-cd ../server && npm install
+npm install           # installs root tools (concurrently)
+npm run install:all   # installs client & server dependencies
 
-# Run project
+# Run both client and server concurrently in one command
 npm run dev
+
+# Or run individually:
+npm run dev:client    # Vite frontend (http://localhost:5173)
+npm run dev:server    # Node/Express backend (http://localhost:5000)
 ```
 
 ---

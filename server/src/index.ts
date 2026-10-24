@@ -3,7 +3,7 @@ dotenv.config();
 import app from './app';
 import connectDB from './db/db';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 // Use require to avoid TypeScript including files outside of `rootDir` during compile
 // @ts-ignore
 import { initSocket } from './socket/chat.socket';
@@ -29,7 +29,7 @@ const io = new Server(httpServer, {
 
 initSocket(io);
 
-io.on('connection', (socket) => {
+io.on('connection', (socket: Socket) => {
   console.log('Connected:', socket.id);
 
   socket.on('register', (userId: string) => {

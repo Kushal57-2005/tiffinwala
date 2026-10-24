@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { api } from '../../utils/api';
 import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -886,7 +887,8 @@ export const CustomerDashboard: React.FC = () => {
                             {order.addOns && order.addOns.length > 0 && (
                               <div className="border-t border-charcoal/5 pt-3.5 mt-3.5">
                                 <p className="text-[10px] font-extrabold uppercase tracking-widest text-cinnamon mb-2.5 font-body flex items-center gap-1.5">
-                                  <span>✨ Extra Add-ons</span>
+                                  <Sparkles className="w-3.5 h-3.5 text-cinnamon inline" />
+                                  <span>Extra Add-ons</span>
                                 </p>
                                 <div className="bg-[#E0653A]/5 border border-[#E0653A]/10 rounded-[18px] p-3.5 space-y-2.5">
                                   {order.addOns.map((addOn, aIdx) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sun, Moon, Calendar, User } from 'lucide-react';
 import { api } from '../../utils/api';
 import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -185,12 +186,22 @@ const CustomerHistory: React.FC = () => {
   const getSessionBadge = (session: 'lunch' | 'dinner') => {
     const isLunch = session === 'lunch';
     return (
-      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border inline-flex items-center gap-1 ${
         isLunch 
           ? 'bg-orange-50 border-orange-200 text-orange-700' 
           : 'bg-indigo-50 border-indigo-200 text-indigo-700'
       }`}>
-        {isLunch ? '🌤 Lunch' : '🌙 Dinner'}
+        {isLunch ? (
+          <>
+            <Sun className="w-3 h-3 text-orange-600 inline" />
+            <span>Lunch</span>
+          </>
+        ) : (
+          <>
+            <Moon className="w-3 h-3 text-indigo-600 inline" />
+            <span>Dinner</span>
+          </>
+        )}
       </span>
     );
   };
@@ -593,7 +604,7 @@ const CustomerHistory: React.FC = () => {
           <div className="space-y-4 animate-scale-up">
             {filteredHistory.length === 0 ? (
               <div className="bg-white/30 backdrop-blur-md border border-[#2B2118]/10 border-dashed rounded-[32px] p-12 text-center flex flex-col items-center justify-center min-h-[240px] shadow-sm max-w-lg mx-auto animate-scale-up mt-8">
-                <p className="text-3xl mb-3 select-none">📅</p>
+                <Calendar className="w-8 h-8 text-charcoal/30 mb-3" />
                 <h3 className="font-display text-lg font-bold text-charcoal mb-2">
                   No orders in this range
                 </h3>
@@ -674,7 +685,7 @@ const CustomerHistory: React.FC = () => {
                             {/* Profile Indicator */}
                             {order.profile && order.profile.toLowerCase() !== 'myself' && (
                               <div className="mt-2 text-[10px] text-charcoal/50 font-body flex items-center gap-1 select-none">
-                                <span>👤</span>
+                                <User className="w-3 h-3" />
                                 <span>{order.profile}</span>
                               </div>
                             )}

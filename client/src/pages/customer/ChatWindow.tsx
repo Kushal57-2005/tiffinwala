@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Flag, Eye, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../utils/api';
 import { socket, connectSocket } from '../../utils/socket';
@@ -586,7 +587,7 @@ export const ChatWindow: React.FC = () => {
               No messages yet
             </h4>
             <p className="text-xs text-charcoal/50 font-body mt-1">
-              Say hello to start the conversation 👋
+              Say hello to start the conversation
             </p>
           </div>
         ) : (
@@ -671,12 +672,15 @@ export const ChatWindow: React.FC = () => {
                                   : 'bg-emerald-50 border-emerald-200 text-emerald-700'
                             }`}
                           >
-                            <span>
+                            <span className="inline-flex items-center gap-1">
+                              {msg.complaintStatus === 'raised' && <Flag className="w-3 h-3 text-amber-600 inline" />}
+                              {msg.complaintStatus === 'acknowledged' && <Eye className="w-3 h-3 text-blue-600 inline" />}
+                              {msg.complaintStatus === 'resolved' && <CheckCircle2 className="w-3 h-3 text-emerald-600 inline" />}
                               {msg.complaintStatus === 'raised'
-                                ? '🚩 Complaint Raised'
+                                ? 'Complaint Raised'
                                 : msg.complaintStatus === 'acknowledged'
-                                  ? '👀 Acknowledged'
-                                  : '✅ Resolved'}
+                                  ? 'Acknowledged'
+                                  : 'Resolved'}
                             </span>
                           </div>
                         )}
@@ -693,12 +697,15 @@ export const ChatWindow: React.FC = () => {
                                     : 'bg-emerald-50 border-emerald-200 text-emerald-700'
                               }`}
                             >
-                              <span>
+                              <span className="inline-flex items-center gap-1">
+                                {msg.complaintStatus === 'raised' && <Flag className="w-3 h-3 text-amber-600 inline" />}
+                                {msg.complaintStatus === 'acknowledged' && <Eye className="w-3 h-3 text-blue-600 inline" />}
+                                {msg.complaintStatus === 'resolved' && <CheckCircle2 className="w-3 h-3 text-emerald-600 inline" />}
                                 {msg.complaintStatus === 'raised'
-                                  ? '🚩 Complaint Raised'
+                                  ? 'Complaint Raised'
                                   : msg.complaintStatus === 'acknowledged'
-                                    ? '👀 Acknowledged'
-                                    : '✅ Resolved'}
+                                    ? 'Acknowledged'
+                                    : 'Resolved'}
                               </span>
                             </div>
 

@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react';
+import { Star } from 'lucide-react';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
 import { MobileNavbar } from '../../components/MobileNavbar';
@@ -181,7 +181,7 @@ export const VendorRatings: React.FC = () => {
                   <span className="text-6xl font-display font-black text-charcoal tracking-tight">
                     {avgRating > 0 ? avgRating.toFixed(1) : '0.0'}
                   </span>
-                  <span className="text-2xl text-amber-500 font-bold">★</span>
+                  <Star className="w-7 h-7 fill-amber-500 text-amber-500 inline self-center" />
                 </div>
                 <div className="flex justify-center mb-4">
                   {renderStars(Math.round(avgRating))}
@@ -200,7 +200,7 @@ export const VendorRatings: React.FC = () => {
                   {starBreakdown.map((row) => (
                     <div key={row.stars} className="flex items-center gap-3 text-xs font-semibold">
                       <span className="w-3 text-charcoal/60 text-right">{row.stars}</span>
-                      <span className="text-amber-500">★</span>
+                      <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 inline" />
                       <div className="flex-1 h-2 rounded-full bg-charcoal/5 overflow-hidden">
                         <div
                           style={{ width: `${row.percentage}%` }}

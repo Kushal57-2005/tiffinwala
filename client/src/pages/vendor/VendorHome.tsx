@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Clock, CheckCircle2, Truck, Package, XCircle } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
 import { api } from '../../utils/api';
@@ -1829,23 +1828,29 @@ export default function VendorHome({
                   }
 
                   let badgeStyle = 'bg-amber-50 border-amber-200 text-amber-700';
-                  let badgeText = '⏳ Pending';
+                  let badgeText = 'Pending';
+                  let StatusIcon = Clock;
 
                   if (order.status === 'pending') {
                     badgeStyle = 'bg-amber-50 border-amber-200 text-amber-700';
-                    badgeText = '⏳ Pending';
+                    badgeText = 'Pending';
+                    StatusIcon = Clock;
                   } else if (order.status === 'accepted') {
                     badgeStyle = 'bg-blue-50 border-blue-200 text-blue-700';
-                    badgeText = '✓ Accepted';
+                    badgeText = 'Accepted';
+                    StatusIcon = CheckCircle2;
                   } else if (order.status === 'delivered') {
                     badgeStyle = 'bg-emerald-50 border-emerald-200 text-emerald-700';
-                    badgeText = '🚚 Delivered';
+                    badgeText = 'Delivered';
+                    StatusIcon = Truck;
                   } else if (order.status === 'received') {
                     badgeStyle = 'bg-violet-50 border-violet-200 text-violet-700';
-                    badgeText = '📦 Received';
+                    badgeText = 'Received';
+                    StatusIcon = Package;
                   } else if (order.status === 'rejected') {
                     badgeStyle = 'bg-red-50 border-red-200 text-red-700';
-                    badgeText = '✕ Rejected';
+                    badgeText = 'Rejected';
+                    StatusIcon = XCircle;
                   }
 
                   const totalTiffins = order.tiers.reduce((sum, t) => sum + (t.quantity || 1), 0);
@@ -1892,9 +1897,10 @@ export default function VendorHome({
                       <div className="flex flex-col gap-2 mt-1">
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold border shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${badgeStyle}`}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold border shadow-[0_1px_2px_rgba(0,0,0,0.02)] inline-flex items-center gap-1.5 ${badgeStyle}`}
                           >
-                            {badgeText}
+                            <StatusIcon className="w-3 h-3 inline" />
+                            <span>{badgeText}</span>
                           </span>
                           {order.addOns &&
                             Object.entries(

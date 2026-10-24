@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/static-components */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Zap } from 'lucide-react';
 import { api } from '../../utils/api';
 import { useAuthStore } from '../../store/authStore';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -904,8 +905,8 @@ export default function Login() {
                                     disabled={loading}
                                     className="py-2.5 px-3 rounded-xl bg-[#5C7A52]/15 hover:bg-[#5C7A52]/25 text-[#3b5234] border border-[#5C7A52]/30 text-xs font-bold flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                                 >
-                                    <span className="flex items-center space-x-1">
-                                        <span>⚡</span>
+                                    <span className="flex items-center space-x-1.5">
+                                        <Zap className="w-3.5 h-3.5 fill-current text-[#5C7A52]" />
                                         <span>Guest Customer</span>
                                     </span>
                                     <span className="text-[9px] font-normal text-charcoal/60 mt-0.5">
@@ -918,8 +919,8 @@ export default function Login() {
                                     disabled={loading}
                                     className="py-2.5 px-3 rounded-xl bg-[#E0653A]/15 hover:bg-[#E0653A]/25 text-[#9d3c1a] border border-[#E0653A]/30 text-xs font-bold flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                                 >
-                                    <span className="flex items-center space-x-1">
-                                        <span>⚡</span>
+                                    <span className="flex items-center space-x-1.5">
+                                        <Zap className="w-3.5 h-3.5 fill-current text-[#E0653A]" />
                                         <span>Guest Vendor</span>
                                     </span>
                                     <span className="text-[9px] font-normal text-charcoal/60 mt-0.5">

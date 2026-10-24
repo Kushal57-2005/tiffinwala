@@ -1,5 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  UtensilsCrossed,
+  Zap,
+  Users,
+  Ticket,
+  CreditCard,
+  Utensils,
+  Handshake,
+  BarChart3,
+  MapPin,
+  Clock,
+  User,
+  ChefHat,
+  CheckCircle2,
+  AlertCircle,
+  Radio,
+  Sparkles,
+} from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../utils/api';
 import tiffinBg from '../assets/slate_spices_bg.png';
@@ -9,12 +27,12 @@ export default function LandingPage() {
   const setUser = useAuthStore((state) => state.setUser);
   const [activeTab, setActiveTab] = useState<'customer' | 'vendor' | 'tech'>('customer');
   const [loginLoading, setLoginLoading] = useState<string | null>(null);
-  const [feedbackMsg, setFeedbackMsg] = useState<string>('');
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // 1-Click Reviewer Auto-Login
   const handleAutoLogin = async (role: 'customer' | 'vendor') => {
     setLoginLoading(role);
-    setFeedbackMsg('');
+    setFeedback(null);
     const email = role === 'customer' ? 'customer@tiffinwala.com' : 'vendor@tiffinwala.com';
     const password = role === 'customer' ? 'customer@123' : 'vendor@123';
 
@@ -24,7 +42,7 @@ export default function LandingPage() {
         const { token, ...userData } = res.data.data;
         localStorage.setItem('token', token);
         setUser(userData);
-        setFeedbackMsg('✅ Customer session verified! Heading to dashboard...');
+        setFeedback({ type: 'success', text: 'Customer session verified! Heading to dashboard...' });
         setTimeout(() => navigate('/customer/home'), 400);
       } else {
         const res = await api.post('/auth/login/vendor', { emailOrPhone: email, password });
@@ -32,7 +50,7 @@ export default function LandingPage() {
           const { token, ...userData } = res.data.data;
           localStorage.setItem('token', token);
           setUser(userData);
-          setFeedbackMsg('✅ Vendor session verified! Heading to kitchen dashboard...');
+          setFeedback({ type: 'success', text: 'Vendor session verified! Heading to kitchen dashboard...' });
           setTimeout(() => navigate('/vendor/home'), 400);
         } else if (res.data?.data?.userId) {
           const otp = res.data?.data?.emailOTP || '123456';
@@ -43,12 +61,12 @@ export default function LandingPage() {
           const { token, ...userData } = step2.data.data;
           localStorage.setItem('token', token);
           setUser(userData);
-          setFeedbackMsg('✅ Vendor session verified! Heading to kitchen dashboard...');
+          setFeedback({ type: 'success', text: 'Vendor session verified! Heading to kitchen dashboard...' });
           setTimeout(() => navigate('/vendor/home'), 400);
         }
       }
     } catch (err: any) {
-      setFeedbackMsg(`❌ Login error: ${err.response?.data?.message || err.message}`);
+      setFeedback({ type: 'error', text: `Login error: ${err.response?.data?.message || err.message}` });
       setLoginLoading(null);
     }
   };
@@ -103,8 +121,8 @@ export default function LandingPage() {
             className="flex items-center space-x-3 cursor-pointer"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#E0653A] to-[#F2B340] flex items-center justify-center text-xl shadow-sm text-white">
-              🍱
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#E0653A] to-[#F2B340] flex items-center justify-center shadow-sm text-white">
+              <UtensilsCrossed className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
@@ -123,8 +141,8 @@ export default function LandingPage() {
             <a href="#vendors" className="hover:text-[#2B2118] transition-colors">For Kitchens</a>
             <a href="#workflow" className="hover:text-[#2B2118] transition-colors">How It Works</a>
             <a href="#architecture" className="hover:text-[#2B2118] transition-colors">Architecture</a>
-            <a href="#reviewer" className="hover:text-[#E0653A] text-[#E0653A] font-bold transition-colors flex items-center space-x-1">
-              <span>⚡</span>
+            <a href="#reviewer" className="hover:text-[#E0653A] text-[#E0653A] font-bold transition-colors flex items-center space-x-1.5">
+              <Zap className="w-4 h-4 fill-current text-[#E0653A]" />
               <span>Reviewer Demos</span>
             </a>
           </div>
@@ -150,15 +168,6 @@ export default function LandingPage() {
       {/* ── HERO SECTION ───────────────────────────────────────── */}
       <section className="relative pt-14 pb-16 md:pt-20 md:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto z-10">
         <div className="text-center max-w-4xl mx-auto space-y-6">
-          {/* Top Pill Badge */}
-          <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-white/70 border border-[#2B2118]/10 text-xs font-semibold text-[#8C5B3E] shadow-sm">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E0653A] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E0653A]"></span>
-            </span>
-            <span>Production MERN + TypeScript Platform | Dual Ecosystem</span>
-          </div>
-
           {/* Main Headline */}
           <h1 className="font-display text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#2B2118] leading-[1.12]">
             The Modern Daily Meal <br />
@@ -183,7 +192,8 @@ export default function LandingPage() {
               disabled={loginLoading !== null}
               className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#5C7A52] hover:bg-[#4a6342] text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center space-x-2 disabled:opacity-50"
             >
-              <span>{loginLoading === 'customer' ? 'Signing in...' : '⚡ Instant Guest Customer'}</span>
+              <Zap className="w-4 h-4 fill-current" />
+              <span>{loginLoading === 'customer' ? 'Signing in...' : 'Instant Guest Customer'}</span>
               <span className="text-xs opacity-80 font-normal">(customer@tiffinwala.com)</span>
             </button>
             <button
@@ -191,15 +201,27 @@ export default function LandingPage() {
               disabled={loginLoading !== null}
               className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#E0653A] hover:bg-[#c5512b] text-white font-bold text-sm shadow-md transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center space-x-2 disabled:opacity-50"
             >
-              <span>{loginLoading === 'vendor' ? 'Signing in...' : '⚡ Instant Guest Vendor'}</span>
+              <Zap className="w-4 h-4 fill-current" />
+              <span>{loginLoading === 'vendor' ? 'Signing in...' : 'Instant Guest Vendor'}</span>
               <span className="text-xs opacity-80 font-normal">(vendor@tiffinwala.com)</span>
             </button>
           </div>
 
-          {feedbackMsg && (
-            <div className="pt-2">
-              <span className="inline-block text-xs font-semibold px-4 py-2 rounded-xl bg-white/80 border border-[#2B2118]/15 text-[#E0653A] shadow-sm animate-pulse">
-                {feedbackMsg}
+          {feedback && (
+            <div className="pt-2 flex justify-center">
+              <span
+                className={`inline-flex items-center space-x-1.5 text-xs font-semibold px-4 py-2 rounded-xl border shadow-sm ${
+                  feedback.type === 'success'
+                    ? 'bg-[#5C7A52]/10 border-[#5C7A52]/25 text-[#426139]'
+                    : 'bg-[#E0653A]/10 border-[#E0653A]/25 text-[#b94a24]'
+                }`}
+              >
+                {feedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-[#5C7A52]" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-[#E0653A]" />
+                )}
+                <span>{feedback.text}</span>
               </span>
             </div>
           )}
@@ -277,44 +299,47 @@ export default function LandingPage() {
           {activeTab === 'customer' && (
             <div id="customers" className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center text-2xl">
-                  👥
+                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-[#5C7A52]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Multi-Profile Roommate Splitting</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Unique differentiator: One customer account can register multiple friend/roommate profiles (e.g. 1 for Aman, 1 for Rahul).
                   Assign individual meals at checkout and receive split ledger tallies at month-end.
                 </p>
-                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1">
-                  <span>✓ Built into Order Schema & Checkout</span>
+                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Built into Order Schema & Checkout</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center text-2xl">
-                  🎟️
+                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center">
+                  <Ticket className="w-6 h-6 text-[#8C5B3E]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Coupon-Based Subscriptions</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Buy a 20-token bundle and redeem meals strictly when you eat. No forced daily deductions if you skip a meal or go home for weekends.
-                  Visual health badges: 🔴 Low (≤3), 🟡 Medium, 🟢 Good.
+                  Visual health badges: Low (≤3), Medium, Good stock.
                 </p>
-                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1">
-                  <span>✓ Fair Expiry = Tokens × 2 Days</span>
+                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Fair Expiry = Tokens × 2 Days</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center text-2xl">
-                  💳
+                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-[#E0653A]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Wallet & Monthly Credit Tab</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Pay instantly using built-in digital wallet, or request a <strong>Monthly Billing Connection</strong> with trusted vendors
                   to add meals to pending dues for consolidated month-end settlement.
                 </p>
-                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1">
-                  <span>✓ Auto-Settled via Month-End Cron</span>
+                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Auto-Settled via Month-End Cron</span>
                 </div>
               </div>
             </div>
@@ -324,44 +349,47 @@ export default function LandingPage() {
           {activeTab === 'vendor' && (
             <div id="vendors" className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center text-2xl">
-                  🍲
+                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center">
+                  <Utensils className="w-6 h-6 text-[#E0653A]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Daily Session Menu Publishing</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Vendors configure distinct Lunch & Dinner sessions with multi-tier pricing (Standard / Deluxe Thali), custom add-ons (extra roti, sweet),
                   and real-time quantity quotas with instant Open/Close kitchen toggles.
                 </p>
-                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1">
-                  <span>✓ Prevents overbooking with quota guards</span>
+                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Prevents overbooking with quota guards</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center text-2xl">
-                  🤝
+                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center">
+                  <Handshake className="w-6 h-6 text-[#8C5B3E]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Credit Customer Management</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Vendors maintain transparent ledger connections for customers on monthly khata. Review incoming credit requests,
                   track each customer's accumulated <code>pendingDue</code>, and see who owes what at a glance.
                 </p>
-                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1">
-                  <span>✓ Connection & DuePayment schemas</span>
+                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Connection & DuePayment schemas</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center text-2xl">
-                  📊
+                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-[#5C7A52]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Platform Fee & Revenue Analytics</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Transparent 10% platform fee auto-deducted each month from the vendor's initial ₹9,999 registration balance.
                   Live analytics for gross revenue, net payout, ratings breakdown, and customer retention metrics.
                 </p>
-                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1">
-                  <span>✓ Automated monthly invoice generation</span>
+                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Automated monthly invoice generation</span>
                 </div>
               </div>
             </div>
@@ -371,36 +399,38 @@ export default function LandingPage() {
           {activeTab === 'tech' && (
             <div id="architecture" className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center text-2xl">
-                  🗺️
+                <div className="w-12 h-12 rounded-2xl bg-[#F2B340]/20 border border-[#F2B340]/40 flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-[#8C5B3E]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Hyperlocal Geospatial Engine</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Leverages MongoDB's <code>2dsphere</code> index. Automatically queries vendors within their specified delivery radius (km)
                   relative to the customer's exact GPS latitude & longitude.
                 </p>
-                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1">
-                  <span>✓ MongoDB $near & $geoWithin Queries</span>
+                <div className="pt-2 text-xs text-[#8C5B3E] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>MongoDB $near & $geoWithin Queries</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center text-2xl">
-                  ⚡
+                <div className="w-12 h-12 rounded-2xl bg-[#5C7A52]/15 border border-[#5C7A52]/30 flex items-center justify-center">
+                  <Radio className="w-6 h-6 text-[#5C7A52]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Real-Time Socket.io Gateway</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
                   Dedicated in-memory socket manager maps active connected user IDs to socket sessions.
                   Instantly unlocks customer-vendor chat upon order placement with built-in complaint lifecycle tracking (<code>Raised</code> → <code>Acknowledged</code> → <code>Resolved</code>).
                 </p>
-                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1">
-                  <span>✓ Bi-directional live messaging</span>
+                <div className="pt-2 text-xs text-[#5C7A52] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Bi-directional live messaging</span>
                 </div>
               </div>
 
               <div className="p-7 rounded-3xl bg-white/80 border border-[#2B2118]/10 shadow-sm space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center text-2xl">
-                  ⏰
+                <div className="w-12 h-12 rounded-2xl bg-[#E0653A]/15 border border-[#E0653A]/30 flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-[#E0653A]" />
                 </div>
                 <h3 className="font-display text-xl font-bold text-[#2B2118]">Scheduled Node-Cron Daemons</h3>
                 <p className="text-sm text-[#2B2118]/75 leading-relaxed">
@@ -408,8 +438,9 @@ export default function LandingPage() {
                   <br />• <strong>Monthly Billing Cron</strong>: Runs midnight on 1st of every month to compute bills, generate HTML/PDF, and email tallies.
                   <br />• <strong>Token Expiry Cron</strong>: Runs daily at 9:00 AM to mark elapsed tokens and trigger push alerts.
                 </p>
-                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1">
-                  <span>✓ Fully backgrounded cron tasks</span>
+                <div className="pt-2 text-xs text-[#E0653A] font-semibold flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Fully backgrounded cron tasks</span>
                 </div>
               </div>
             </div>
@@ -474,11 +505,9 @@ export default function LandingPage() {
       <section id="reviewer" className="py-20 bg-white/40 border-t border-[#2B2118]/10 relative z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="p-8 sm:p-12 rounded-[32px] bg-white/80 border border-[#E0653A]/25 backdrop-blur-md shadow-sm relative overflow-hidden">
-            {/* Status indicator */}
             <div className="flex items-center space-x-2 mb-3">
-              <span className="flex h-3 w-3 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E0653A] opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E0653A]"></span>
+              <span className="p-1 rounded-lg bg-[#E0653A]/10 text-[#E0653A]">
+                <Sparkles className="w-3.5 h-3.5" />
               </span>
               <span className="text-xs font-bold uppercase tracking-widest text-[#E0653A] font-body">
                 Recruiter & Reviewer Test Drive
@@ -498,7 +527,7 @@ export default function LandingPage() {
               <div className="p-6 rounded-2xl bg-[#FBF4EC] border border-[#2B2118]/10 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xl">🧑‍💻</span>
+                    <User className="w-5 h-5 text-[#5C7A52]" />
                     <span className="font-bold text-sm text-[#2B2118]">Customer Demo Account</span>
                   </div>
                   <span className="text-[10px] bg-[#5C7A52]/15 text-[#426139] px-2 py-0.5 rounded-full font-semibold border border-[#5C7A52]/25">
@@ -513,9 +542,10 @@ export default function LandingPage() {
                 <button
                   onClick={() => handleAutoLogin('customer')}
                   disabled={loginLoading !== null}
-                  className="w-full mt-2 py-3 rounded-xl bg-[#5C7A52] hover:bg-[#4a6342] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-sm active:scale-[0.98] disabled:opacity-50"
+                  className="w-full mt-2 py-3 rounded-xl bg-[#5C7A52] hover:bg-[#4a6342] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-1.5"
                 >
-                  {loginLoading === 'customer' ? 'Signing In...' : '⚡ Auto-Run Customer Session'}
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>{loginLoading === 'customer' ? 'Signing In...' : 'Auto-Run Customer Session'}</span>
                 </button>
               </div>
 
@@ -523,7 +553,7 @@ export default function LandingPage() {
               <div className="p-6 rounded-2xl bg-[#FBF4EC] border border-[#2B2118]/10 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xl">🧑‍🍳</span>
+                    <ChefHat className="w-5 h-5 text-[#E0653A]" />
                     <span className="font-bold text-sm text-[#2B2118]">Vendor Demo Kitchen</span>
                   </div>
                   <span className="text-[10px] bg-[#E0653A]/15 text-[#b94a24] px-2 py-0.5 rounded-full font-semibold border border-[#E0653A]/25">
@@ -538,9 +568,10 @@ export default function LandingPage() {
                 <button
                   onClick={() => handleAutoLogin('vendor')}
                   disabled={loginLoading !== null}
-                  className="w-full mt-2 py-3 rounded-xl bg-[#E0653A] hover:bg-[#c5512b] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-sm active:scale-[0.98] disabled:opacity-50"
+                  className="w-full mt-2 py-3 rounded-xl bg-[#E0653A] hover:bg-[#c5512b] text-white font-bold text-xs tracking-wider uppercase transition-all shadow-sm active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-1.5"
                 >
-                  {loginLoading === 'vendor' ? 'Signing In...' : '⚡ Auto-Run Vendor Session'}
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>{loginLoading === 'vendor' ? 'Signing In...' : 'Auto-Run Vendor Session'}</span>
                 </button>
               </div>
             </div>
@@ -551,7 +582,7 @@ export default function LandingPage() {
       {/* ── FOOTER ─────────────────────────────────────────────── */}
       <footer className="py-12 border-t border-[#2B2118]/10 text-center text-xs text-[#2B2118]/70 space-y-4 bg-white/40">
         <div className="flex items-center justify-center space-x-2">
-          <span className="text-lg">🍱</span>
+          <UtensilsCrossed className="w-5 h-5 text-[#E0653A]" />
           <span className="font-display font-bold text-base text-[#2B2118]">TiffinWala</span>
           <span className="text-[#2B2118]/30">|</span>
           <span>Crafted with MERN & TypeScript</span>

@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Wrench, User, Users, Clock, CheckCircle2, Truck, Package, XCircle, Star, Check } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../utils/api';
 import tiffinBg from '../../assets/slate_spices_bg.png';
@@ -1402,8 +1401,9 @@ export default function CustomerHome({
 
           {/* Developer Toggles for empty state preview */}
           <div className="mt-2 mb-8 flex flex-wrap gap-4 items-center justify-start bg-amber-500/5 border border-dashed border-amber-500/35 backdrop-blur-md px-5 py-3.5 rounded-2xl text-xs font-semibold text-[#2B2118]/70 shadow-sm relative z-20">
-            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-800 text-[9px] font-extrabold tracking-wider uppercase flex items-center gap-1 select-none">
-              🛠 DEV ONLY
+            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-800 text-[9px] font-extrabold tracking-wider uppercase flex items-center gap-1.5 select-none">
+              <Wrench className="w-3 h-3 text-amber-800" />
+              <span>DEV ONLY</span>
             </span>
             <span className="text-[10px] uppercase font-bold text-[#2B2118]/50 tracking-wider">
               Dev Sandbox Tools:
@@ -1693,27 +1693,33 @@ export default function CustomerHome({
                       let badgeText = '⏳ Pending';
                       let extraStyle = '';
 
+                      let StatusIcon = Clock;
                       switch (order.status) {
                         case 'accepted':
                           badgeStyle = 'bg-blue-50 border-blue-200 text-blue-700';
-                          badgeText = '✓ Accepted';
+                          badgeText = 'Accepted';
+                          StatusIcon = CheckCircle2;
                           break;
                         case 'rejected':
                           badgeStyle = 'bg-red-50 border-red-200 text-red-700';
-                          badgeText = '✕ Rejected';
+                          badgeText = 'Rejected';
+                          StatusIcon = XCircle;
                           extraStyle = 'opacity-70';
                           break;
                         case 'delivered':
                           badgeStyle = 'bg-emerald-50 border-emerald-200 text-emerald-700';
-                          badgeText = '🚚 Delivered';
+                          badgeText = 'Delivered';
+                          StatusIcon = Truck;
                           break;
                         case 'received':
                           badgeStyle = 'bg-violet-50 border-violet-200 text-violet-700';
-                          badgeText = '📦 Received';
+                          badgeText = 'Received';
+                          StatusIcon = Package;
                           break;
                         case 'pending':
                           badgeStyle = 'bg-amber-50 border-amber-200 text-amber-700';
-                          badgeText = '⏳ Pending';
+                          badgeText = 'Pending';
+                          StatusIcon = Clock;
                           break;
                       }
 
@@ -1763,9 +1769,10 @@ export default function CustomerHome({
                             <div className="flex flex-col gap-2 mt-1">
                               <div className="flex">
                                 <span
-                                  className={`px-3 py-1 rounded-md text-[10px] font-bold border shadow-[0_1px_2px_rgba(0,0,0,0.02)] ${badgeStyle}`}
+                                  className={`px-3 py-1 rounded-md text-[10px] font-bold border shadow-[0_1px_2px_rgba(0,0,0,0.02)] inline-flex items-center gap-1.5 ${badgeStyle}`}
                                 >
-                                  {badgeText}
+                                  <StatusIcon className="w-3 h-3 inline" />
+                                  <span>{badgeText}</span>
                                 </span>
                               </div>
 
@@ -1849,11 +1856,11 @@ export default function CustomerHome({
                                     >
                                       {isRated ? (
                                         <>
-                                          <span className="text-leaf text-xs font-bold">✓</span> Rated
+                                          <Check className="w-3.5 h-3.5 text-leaf inline" /> Rated
                                         </>
                                       ) : (
                                         <>
-                                          <span className="text-amber-400 text-xs">★</span> Rate Vendor
+                                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 inline" /> Rate Vendor
                                         </>
                                       )}
                                     </button>
@@ -2958,7 +2965,10 @@ export default function CustomerHome({
                     : 'text-[#2B2118]/50 hover:text-[#2B2118]'
                 }`}
               >
-                👤 My Profile
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>My Profile</span>
+                </span>
               </button>
               <button
                 onClick={() => {
@@ -2972,7 +2982,10 @@ export default function CustomerHome({
                     : 'text-[#2B2118]/50 hover:text-[#2B2118]'
                 }`}
               >
-                👥 My Friends
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>My Friends</span>
+                </span>
               </button>
             </div>
 
@@ -3819,11 +3832,11 @@ export default function CustomerHome({
                       ))}
                     </div>
                     <span className="text-xs font-bold font-body text-[#5C7A52] mt-1">
-                      {ratingStars === 1 && 'Terrible 😞'}
-                      {ratingStars === 2 && 'Bad 🙁'}
-                      {ratingStars === 3 && 'Average 😐'}
-                      {ratingStars === 4 && 'Good 🙂'}
-                      {ratingStars === 5 && 'Excellent! 😍'}
+                      {ratingStars === 1 && 'Terrible'}
+                      {ratingStars === 2 && 'Bad'}
+                      {ratingStars === 3 && 'Average'}
+                      {ratingStars === 4 && 'Good'}
+                      {ratingStars === 5 && 'Excellent!'}
                     </span>
                   </div>
 

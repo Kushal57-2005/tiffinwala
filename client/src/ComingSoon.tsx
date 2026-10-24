@@ -1,9 +1,13 @@
+import { Construction, UtensilsCrossed } from 'lucide-react';
+
 function ComingSoon() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-300">
             <div className="text-center p-8 bg-white shadow-xl rounded-2xl max-w-md w-full">
                 {/* Icon */}
-                <div className="text-6xl mb-4 animate-bounce">🚧</div>
+                <div className="flex justify-center mb-4">
+                    <Construction className="w-16 h-16 text-amber-500 animate-bounce" />
+                </div>
 
                 {/* Title */}
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
@@ -11,8 +15,8 @@ function ComingSoon() {
                 </h1>
 
                 {/* Subtitle */}
-                <p className="text-lg text-gray-600 mb-4">
-                    We're cooking something amazing for you 🍱
+                <p className="text-lg text-gray-600 mb-4 inline-flex items-center justify-center gap-2">
+                    We're cooking something amazing for you <UtensilsCrossed className="w-5 h-5 text-spice inline" />
                 </p>
 
                 {/* Status */}

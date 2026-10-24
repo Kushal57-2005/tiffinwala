@@ -5,6 +5,7 @@ import { useAuthStore } from './store/authStore';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { socket, connectSocket, disconnectSocket } from './utils/socket';
 
+import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/login';
 import Register from './pages/auth/register';
 import ForgetPassword from './pages/auth/forget-password';
@@ -26,6 +27,34 @@ import { CustomerDashboard } from './pages/customer/CustomerDashboard';
 import CustomerChatPage from './pages/customer/ChatPage';
 import CustomerChatWindow from './pages/customer/ChatWindow';
 import CustomerHistory from './pages/customer/CustomerHistory';
+
+function RootRoute() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const user = useAuthStore((s) => s.user);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#1F1710] flex items-center justify-center text-white font-body">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-10 h-10 border-2 border-[#E0653A] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-[#C7CCD1] tracking-wider uppercase font-semibold">
+            Authenticating TiffinWala...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && user) {
+    if (user.role === 'vendor') {
+      return <Navigate to="/vendor/home" replace />;
+    }
+    return <Navigate to="/customer/home" replace />;
+  }
+
+  return <LandingPage />;
+}
 
 function App() {
   const fetchUser = useAuthStore((s) => s.fetchUser);
@@ -55,7 +84,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* ── Public routes ─────────────────────────────────── */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forget-password" element={<ForgetPassword />} />
